@@ -16,6 +16,12 @@ const relationshipRoutes = {
   [ROLES.USER]: '/app/relationships',
 };
 
+const treeRoutes = {
+  [ROLES.SUPER_ADMIN]: '/super-admin/tree',
+  [ROLES.ADMIN]: '/admin/tree',
+  [ROLES.USER]: '/app/tree',
+};
+
 const dashboardConfig = {
   [ROLES.SUPER_ADMIN]: {
     title: 'Platform Command Center',
@@ -67,9 +73,9 @@ export function DashboardPage({ role }) {
           <Link className="nav-item" to={relationshipRoutes[role]}>
             Relationships
           </Link>
-          <a className="nav-item" href="#tree">
+          <Link className="nav-item" to={treeRoutes[role]}>
             Family Tree
-          </a>
+          </Link>
         </nav>
       </aside>
 
@@ -109,12 +115,12 @@ export function DashboardPage({ role }) {
         <Card className="next-work" padding="lg" variant="elevated">
           <UsersRound aria-hidden="true" />
           <div>
-            <h2>Next module</h2>
+            <h2>Tree view</h2>
             <p>
-              Family and member management is now available as the first product module.
+              Use member and relationship records to view the first family tree graph.
             </p>
-            <Link className="inline-action" to={memberRoutes[role]}>
-              Open members
+            <Link className="inline-action" to={treeRoutes[role]}>
+              Open tree
             </Link>
           </div>
         </Card>

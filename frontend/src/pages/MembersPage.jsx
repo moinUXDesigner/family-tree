@@ -30,6 +30,12 @@ const relationshipRoutes = {
   [ROLES.USER]: '/app/relationships',
 };
 
+const treeRoutes = {
+  [ROLES.SUPER_ADMIN]: '/super-admin/tree',
+  [ROLES.ADMIN]: '/admin/tree',
+  [ROLES.USER]: '/app/tree',
+};
+
 const emptyForm = {
   family_id: '',
   first_name: '',
@@ -165,9 +171,9 @@ export function MembersPage({ role }) {
           <Link className="nav-item" to={relationshipRoutes[role]}>
             Relationships
           </Link>
-          <a className="nav-item" href="#tree">
+          <Link className="nav-item" to={treeRoutes[role]}>
             Family Tree
-          </a>
+          </Link>
         </nav>
       </aside>
 
