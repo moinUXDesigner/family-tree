@@ -36,6 +36,8 @@ Backend folder:  public_html/api-familytree
 Backend public:  public_html/api-familytree/public
 ```
 
+Set the API subdomain PHP version to PHP 8.4 or newer.
+
 Production frontend env:
 
 ```env
@@ -54,4 +56,3 @@ FRONTEND_URL=https://familytree.khajamynuddin.com
 SANCTUM_STATEFUL_DOMAINS=familytree.khajamynuddin.com
 SESSION_DOMAIN=.khajamynuddin.com
 ```
-

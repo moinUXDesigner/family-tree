@@ -28,7 +28,6 @@ API:      https://api-familytree.khajamynuddin.com/api/v1
 ## Phase 1 Status
 
 - Frontend foundation is scaffolded.
-- Local Docker services are defined for Laravel + MariaDB.
+- Local Docker services are defined for Laravel PHP 8.4 + MariaDB.
 - Hostinger shared-hosting paths are documented.
 - Laravel app creation is the next backend setup step.
-

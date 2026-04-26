@@ -2,23 +2,51 @@
 
 Laravel API for the Family Tree platform.
 
-## Local Setup
+## Local Development
 
-Composer is not installed on the Windows host yet, so create the Laravel app by either installing Composer locally or using the Docker PHP image after it is built.
-
-Recommended once Composer is available:
+The local API is designed to run through the root `docker-compose.yml`.
 
 ```powershell
-composer create-project laravel/laravel backend
-cd backend
-composer require laravel/sanctum
-php artisan key:generate
-php artisan migrate
+docker compose up -d mariadb
+docker compose run --rm backend composer install
+docker compose run --rm backend php artisan key:generate
+docker compose run --rm backend php artisan migrate
+docker compose up backend
 ```
 
-For local Docker database values, use `backend/.env.example`.
+Local API URL:
 
-## Production Hosting
+```text
+http://localhost:8000/api/v1
+```
+
+## Auth Endpoints
+
+```text
+GET  /api/v1/health
+POST /api/v1/register
+POST /api/v1/login
+GET  /api/v1/me
+POST /api/v1/logout
+```
+
+Protected role probes:
+
+```text
+GET /api/v1/super-admin/ping
+GET /api/v1/admin/ping
+GET /api/v1/user/ping
+```
+
+## Roles
+
+```text
+super_admin
+admin
+user
+```
+
+## Hostinger Production
 
 Hostinger shared-hosting target:
 
@@ -32,9 +60,4 @@ The API subdomain document root should point to:
 public_html/api-familytree/public
 ```
 
-Production URL:
-
-```text
-https://api-familytree.khajamynuddin.com/api/v1
-```
-
+Set the API subdomain PHP version to PHP 8.4 or newer.
