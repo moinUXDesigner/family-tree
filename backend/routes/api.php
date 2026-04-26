@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FamilyController;
 use App\Http\Controllers\Api\FamilyMemberController;
+use App\Http\Controllers\Api\FamilyRelationshipController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -24,12 +25,15 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware('role:user,admin,super_admin')->group(function (): void {
             Route::get('/families', [FamilyController::class, 'index']);
             Route::get('/family-members', [FamilyMemberController::class, 'index']);
+            Route::get('/family-relationships', [FamilyRelationshipController::class, 'index']);
         });
 
         Route::middleware('role:admin,super_admin')->group(function (): void {
             Route::post('/family-members', [FamilyMemberController::class, 'store']);
             Route::put('/family-members/{familyMember}', [FamilyMemberController::class, 'update']);
             Route::delete('/family-members/{familyMember}', [FamilyMemberController::class, 'destroy']);
+            Route::post('/family-relationships', [FamilyRelationshipController::class, 'store']);
+            Route::delete('/family-relationships/{familyRelationship}', [FamilyRelationshipController::class, 'destroy']);
         });
 
         Route::middleware('role:super_admin')->post('/families', [FamilyController::class, 'store']);

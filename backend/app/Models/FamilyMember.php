@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'family_id',
@@ -52,6 +53,22 @@ class FamilyMember extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * @return HasMany<FamilyRelationship, $this>
+     */
+    public function relationshipsFrom(): HasMany
+    {
+        return $this->hasMany(FamilyRelationship::class, 'from_member_id');
+    }
+
+    /**
+     * @return HasMany<FamilyRelationship, $this>
+     */
+    public function relationshipsTo(): HasMany
+    {
+        return $this->hasMany(FamilyRelationship::class, 'to_member_id');
     }
 
     /**

@@ -32,6 +32,14 @@ class Family extends Model
     }
 
     /**
+     * @return HasMany<FamilyRelationship, $this>
+     */
+    public function relationships(): HasMany
+    {
+        return $this->hasMany(FamilyRelationship::class);
+    }
+
+    /**
      * @return HasMany<User, $this>
      */
     public function users(): HasMany

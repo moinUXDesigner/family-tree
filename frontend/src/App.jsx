@@ -3,6 +3,7 @@ import { LoginPage } from './pages/LoginPage.jsx';
 import { RegisterPage } from './pages/RegisterPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { MembersPage } from './pages/MembersPage.jsx';
+import { RelationshipsPage } from './pages/RelationshipsPage.jsx';
 import { RequireAuth } from './auth/RequireAuth.jsx';
 import { RequireRole } from './auth/RequireRole.jsx';
 import { ROLE_HOME, ROLES } from './config/roles.js';
@@ -35,16 +36,22 @@ export function App() {
             path="/super-admin/members"
             element={<MembersPage role={ROLES.SUPER_ADMIN} />}
           />
+          <Route
+            path="/super-admin/relationships"
+            element={<RelationshipsPage role={ROLES.SUPER_ADMIN} />}
+          />
         </Route>
 
         <Route element={<RequireRole roles={[ROLES.ADMIN]} />}>
           <Route path="/admin/dashboard" element={<DashboardPage role={ROLES.ADMIN} />} />
           <Route path="/admin/members" element={<MembersPage role={ROLES.ADMIN} />} />
+          <Route path="/admin/relationships" element={<RelationshipsPage role={ROLES.ADMIN} />} />
         </Route>
 
         <Route element={<RequireRole roles={[ROLES.USER]} />}>
           <Route path="/app/dashboard" element={<DashboardPage role={ROLES.USER} />} />
           <Route path="/app/members" element={<MembersPage role={ROLES.USER} />} />
+          <Route path="/app/relationships" element={<RelationshipsPage role={ROLES.USER} />} />
         </Route>
       </Route>
 

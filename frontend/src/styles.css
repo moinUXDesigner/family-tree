@@ -352,7 +352,8 @@ p {
   color: var(--primary);
 }
 
-.member-form {
+.member-form,
+.relationship-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
@@ -383,7 +384,8 @@ p {
   outline: none;
 }
 
-.member-form-wide {
+.member-form-wide,
+.relationship-form-wide {
   grid-column: 1 / -1;
 }
 
@@ -392,6 +394,11 @@ p {
 }
 
 .member-list {
+  display: grid;
+  gap: 12px;
+}
+
+.relationship-list {
   display: grid;
   gap: 12px;
 }
@@ -444,6 +451,64 @@ p {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.relationship-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: #ffffff;
+  padding: 14px;
+}
+
+.relationship-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: var(--secondary-light);
+  color: var(--teal);
+}
+
+.relationship-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.relationship-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.relationship-main strong {
+  color: #111827;
+}
+
+.relationship-main span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b7280;
+  font-weight: 800;
+}
+
+.relationship-main span svg {
+  width: 16px;
+  height: 16px;
+}
+
+.relationship-main p {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  color: #6b7280;
+  line-height: 1.5;
 }
 
 .text-action {
@@ -502,7 +567,9 @@ p {
   }
 
   .member-form,
-  .member-row {
+  .relationship-form,
+  .member-row,
+  .relationship-row {
     grid-template-columns: 1fr;
   }
 

@@ -10,6 +10,12 @@ const memberRoutes = {
   [ROLES.USER]: '/app/members',
 };
 
+const relationshipRoutes = {
+  [ROLES.SUPER_ADMIN]: '/super-admin/relationships',
+  [ROLES.ADMIN]: '/admin/relationships',
+  [ROLES.USER]: '/app/relationships',
+};
+
 const dashboardConfig = {
   [ROLES.SUPER_ADMIN]: {
     title: 'Platform Command Center',
@@ -57,6 +63,9 @@ export function DashboardPage({ role }) {
           </Link>
           <Link className="nav-item" to={memberRoutes[role]}>
             Members
+          </Link>
+          <Link className="nav-item" to={relationshipRoutes[role]}>
+            Relationships
           </Link>
           <a className="nav-item" href="#tree">
             Family Tree

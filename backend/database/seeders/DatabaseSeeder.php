@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Family;
 use App\Models\FamilyMember;
+use App\Models\FamilyRelationship;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -113,6 +114,63 @@ class DatabaseSeeder extends Seeder
                 ],
                 [
                     ...$member,
+                    'family_id' => $family->id,
+                    'created_by' => $admin?->id,
+                ],
+            );
+        }
+
+        $amina = FamilyMember::query()
+            ->where('family_id', $family->id)
+            ->where('first_name', 'Amina')
+            ->where('last_name', 'Khan')
+            ->first();
+        $omar = FamilyMember::query()
+            ->where('family_id', $family->id)
+            ->where('first_name', 'Omar')
+            ->where('last_name', 'Khan')
+            ->first();
+        $linkedUser = FamilyMember::query()
+            ->where('family_id', $family->id)
+            ->where('first_name', 'End')
+            ->where('last_name', 'User')
+            ->first();
+
+        $relationships = [
+            [
+                'from_member_id' => $amina?->id,
+                'to_member_id' => $omar?->id,
+                'relationship_type' => FamilyRelationship::TYPE_SPOUSE,
+                'notes' => 'Seed relationship for validating spouse links.',
+            ],
+            [
+                'from_member_id' => $amina?->id,
+                'to_member_id' => $linkedUser?->id,
+                'relationship_type' => FamilyRelationship::TYPE_PARENT,
+                'notes' => 'Seed relationship for validating parent-child links.',
+            ],
+            [
+                'from_member_id' => $omar?->id,
+                'to_member_id' => $linkedUser?->id,
+                'relationship_type' => FamilyRelationship::TYPE_PARENT,
+                'notes' => 'Seed relationship for validating parent-child links.',
+            ],
+        ];
+
+        foreach ($relationships as $relationship) {
+            if (! $relationship['from_member_id'] || ! $relationship['to_member_id']) {
+                continue;
+            }
+
+            FamilyRelationship::query()->updateOrCreate(
+                [
+                    'family_id' => $family->id,
+                    'from_member_id' => $relationship['from_member_id'],
+                    'to_member_id' => $relationship['to_member_id'],
+                    'relationship_type' => $relationship['relationship_type'],
+                ],
+                [
+                    ...$relationship,
                     'family_id' => $family->id,
                     'created_by' => $admin?->id,
                 ],
