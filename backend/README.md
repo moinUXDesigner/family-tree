@@ -38,6 +38,22 @@ GET /api/v1/admin/ping
 GET /api/v1/user/ping
 ```
 
+## Demo Users
+
+Run seeders locally:
+
+```powershell
+docker compose run --rm backend php artisan db:seed
+```
+
+Credentials:
+
+```text
+superadmin@familytree.test / password123
+admin@familytree.test      / password123
+user@familytree.test       / password123
+```
+
 ## Roles
 
 ```text

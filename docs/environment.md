@@ -56,3 +56,13 @@ FRONTEND_URL=https://familytree.khajamynuddin.com
 SANCTUM_STATEFUL_DOMAINS=familytree.khajamynuddin.com
 SESSION_DOMAIN=.khajamynuddin.com
 ```
+
+## Frontend RBAC Routes
+
+```text
+/login
+/register
+/super-admin/dashboard
+/admin/dashboard
+/app/dashboard
+```

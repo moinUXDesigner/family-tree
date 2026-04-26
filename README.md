@@ -31,3 +31,13 @@ API:      https://api-familytree.khajamynuddin.com/api/v1
 - Local Docker services are defined for Laravel PHP 8.4 + MariaDB.
 - Hostinger shared-hosting paths are documented.
 - Laravel app creation is the next backend setup step.
+
+## Local Demo Users
+
+After running backend seeders, use these accounts:
+
+```text
+superadmin@familytree.test / password123
+admin@familytree.test      / password123
+user@familytree.test       / password123
+```

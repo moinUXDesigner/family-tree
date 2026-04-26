@@ -1,59 +1,47 @@
-import { ShieldCheck, TreePine, UsersRound } from 'lucide-react';
-import { apiConfig } from './config/api.js';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { LoginPage } from './pages/LoginPage.jsx';
+import { RegisterPage } from './pages/RegisterPage.jsx';
+import { DashboardPage } from './pages/DashboardPage.jsx';
+import { RequireAuth } from './auth/RequireAuth.jsx';
+import { RequireRole } from './auth/RequireRole.jsx';
+import { ROLE_HOME, ROLES } from './config/roles.js';
+import { useAuth } from './auth/useAuth.js';
 
-const setupItems = [
-  {
-    icon: ShieldCheck,
-    title: 'RBAC Ready',
-    text: 'Super Admin, Admin, and End User layouts will be protected from the first auth phase.',
-  },
-  {
-    icon: TreePine,
-    title: 'Tree First',
-    text: 'The frontend is prepared for a relationship-driven family tree experience.',
-  },
-  {
-    icon: UsersRound,
-    title: 'Hostinger Ready',
-    text: 'The app builds as static files for the familytree subdomain.',
-  },
-];
+function HomeRedirect() {
+  const { user } = useAuth();
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to={ROLE_HOME[user.role] ?? ROLE_HOME[ROLES.USER]} replace />;
+}
 
 export function App() {
   return (
-    <main className="app-shell">
-      <section className="hero">
-        <p className="eyebrow">Family Network Platform</p>
-        <h1>Project foundation is ready.</h1>
-        <p className="hero-copy">
-          React Vite is prepared for role-based dashboards, Laravel API integration, and Hostinger deployment.
-        </p>
-        <div className="meta-grid" aria-label="Environment summary">
-          <div>
-            <span>Frontend</span>
-            <strong>familytree.khajamynuddin.com</strong>
-          </div>
-          <div>
-            <span>API</span>
-            <strong>{apiConfig.baseUrl}</strong>
-          </div>
-        </div>
-      </section>
+    <Routes>
+      <Route path="/" element={<HomeRedirect />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
-      <section className="setup-grid" aria-label="Foundation features">
-        {setupItems.map((item) => {
-          const Icon = item.icon;
+      <Route element={<RequireAuth />}>
+        <Route element={<RequireRole roles={[ROLES.SUPER_ADMIN]} />}>
+          <Route
+            path="/super-admin/dashboard"
+            element={<DashboardPage role={ROLES.SUPER_ADMIN} />}
+          />
+        </Route>
 
-          return (
-            <article className="setup-card" key={item.title}>
-              <Icon aria-hidden="true" />
-              <h2>{item.title}</h2>
-              <p>{item.text}</p>
-            </article>
-          );
-        })}
-      </section>
-    </main>
+        <Route element={<RequireRole roles={[ROLES.ADMIN]} />}>
+          <Route path="/admin/dashboard" element={<DashboardPage role={ROLES.ADMIN} />} />
+        </Route>
+
+        <Route element={<RequireRole roles={[ROLES.USER]} />}>
+          <Route path="/app/dashboard" element={<DashboardPage role={ROLES.USER} />} />
+        </Route>
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
-

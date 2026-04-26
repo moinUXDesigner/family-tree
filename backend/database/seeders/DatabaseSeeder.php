@@ -15,11 +15,34 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $users = [
+            [
+                'name' => 'Super Admin',
+                'email' => 'superadmin@familytree.test',
+                'role' => User::ROLE_SUPER_ADMIN,
+            ],
+            [
+                'name' => 'Family Admin',
+                'email' => 'admin@familytree.test',
+                'role' => User::ROLE_ADMIN,
+            ],
+            [
+                'name' => 'End User',
+                'email' => 'user@familytree.test',
+                'role' => User::ROLE_USER,
+            ],
+        ];
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        foreach ($users as $user) {
+            User::query()->updateOrCreate(
+                ['email' => $user['email']],
+                [
+                    'name' => $user['name'],
+                    'password' => 'password123',
+                    'role' => $user['role'],
+                    'is_active' => true,
+                ],
+            );
+        }
     }
 }
