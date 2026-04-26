@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\FamilyController;
+use App\Http\Controllers\Api\FamilyMemberController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -18,6 +20,19 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
+
+        Route::middleware('role:user,admin,super_admin')->group(function (): void {
+            Route::get('/families', [FamilyController::class, 'index']);
+            Route::get('/family-members', [FamilyMemberController::class, 'index']);
+        });
+
+        Route::middleware('role:admin,super_admin')->group(function (): void {
+            Route::post('/family-members', [FamilyMemberController::class, 'store']);
+            Route::put('/family-members/{familyMember}', [FamilyMemberController::class, 'update']);
+            Route::delete('/family-members/{familyMember}', [FamilyMemberController::class, 'destroy']);
+        });
+
+        Route::middleware('role:super_admin')->post('/families', [FamilyController::class, 'store']);
 
         Route::middleware('role:super_admin')->get('/super-admin/ping', fn () => response()->json([
             'status' => true,

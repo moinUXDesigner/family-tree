@@ -14,8 +14,10 @@ async function request(path, options = {}) {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    const validationMessage = payload.errors ? Object.values(payload.errors).flat()[0] : null;
     const message =
       payload.message ??
+      validationMessage ??
       payload.errors?.email?.[0] ??
       payload.errors?.password?.[0] ??
       'Request failed.';
@@ -36,6 +38,19 @@ export const apiClient = {
     return request(path, {
       method: 'POST',
       body: JSON.stringify(body),
+      token,
+    });
+  },
+  put(path, body, token) {
+    return request(path, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+      token,
+    });
+  },
+  delete(path, token) {
+    return request(path, {
+      method: 'DELETE',
       token,
     });
   },

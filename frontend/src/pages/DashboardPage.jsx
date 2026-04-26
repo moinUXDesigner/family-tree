@@ -1,7 +1,14 @@
+import { Link } from 'react-router-dom';
 import { LogOut, ShieldCheck, TreePine, UsersRound } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
-import { ROLE_LABELS, ROLES } from '../config/roles.js';
+import { ROLE_HOME, ROLE_LABELS, ROLES } from '../config/roles.js';
 import { Badge, Button, Card, StatCard } from '../app/components';
+
+const memberRoutes = {
+  [ROLES.SUPER_ADMIN]: '/super-admin/members',
+  [ROLES.ADMIN]: '/admin/members',
+  [ROLES.USER]: '/app/members',
+};
 
 const dashboardConfig = {
   [ROLES.SUPER_ADMIN]: {
@@ -45,12 +52,12 @@ export function DashboardPage({ role }) {
           <span>Family Tree</span>
         </div>
         <nav aria-label="Dashboard navigation">
-          <a className="nav-item active" href="#overview">
+          <Link className="nav-item active" to={ROLE_HOME[role]}>
             Overview
-          </a>
-          <a className="nav-item" href="#members">
+          </Link>
+          <Link className="nav-item" to={memberRoutes[role]}>
             Members
-          </a>
+          </Link>
           <a className="nav-item" href="#tree">
             Family Tree
           </a>
@@ -95,8 +102,11 @@ export function DashboardPage({ role }) {
           <div>
             <h2>Next module</h2>
             <p>
-              Family and member management will plug into this authenticated shell next.
+              Family and member management is now available as the first product module.
             </p>
+            <Link className="inline-action" to={memberRoutes[role]}>
+              Open members
+            </Link>
           </div>
         </Card>
       </section>
