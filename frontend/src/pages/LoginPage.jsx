@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { LogIn, Network } from 'lucide-react';
+import { LogIn, Mail, Network, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLE_HOME, ROLES } from '../config/roles.js';
+import { Alert, Button, Card, Input } from '../app/components';
 
 export function LoginPage() {
   const { isAuthenticated, login, user } = useAuth();
@@ -37,7 +38,7 @@ export function LoginPage() {
 
   return (
     <main className="auth-page">
-      <section className="auth-panel">
+      <Card className="auth-panel" padding="lg" variant="elevated">
         <div className="brand-mark">
           <Network aria-hidden="true" />
         </div>
@@ -48,40 +49,40 @@ export function LoginPage() {
         </p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
-          <label>
-            Email
-            <input
-              autoComplete="email"
-              type="email"
-              value={form.email}
-              onChange={(event) => setForm({ ...form, email: event.target.value })}
-              required
-            />
-          </label>
+          <Input
+            autoComplete="email"
+            label="Email"
+            leftIcon={<Mail aria-hidden="true" size={18} />}
+            type="email"
+            value={form.email}
+            onChange={(event) => setForm({ ...form, email: event.target.value })}
+            required
+            fullWidth
+          />
 
-          <label>
-            Password
-            <input
-              autoComplete="current-password"
-              type="password"
-              value={form.password}
-              onChange={(event) => setForm({ ...form, password: event.target.value })}
-              required
-            />
-          </label>
+          <Input
+            autoComplete="current-password"
+            label="Password"
+            leftIcon={<ShieldCheck aria-hidden="true" size={18} />}
+            type="password"
+            value={form.password}
+            onChange={(event) => setForm({ ...form, password: event.target.value })}
+            required
+            fullWidth
+          />
 
-          {error ? <p className="form-error">{error}</p> : null}
+          {error ? <Alert variant="error">{error}</Alert> : null}
 
-          <button className="primary-action" disabled={isSubmitting} type="submit">
+          <Button disabled={isSubmitting} fullWidth isLoading={isSubmitting} type="submit">
             <LogIn aria-hidden="true" />
-            {isSubmitting ? 'Signing in...' : 'Sign in'}
-          </button>
+            Sign in
+          </Button>
         </form>
 
         <p className="auth-switch">
           New family member? <Link to="/register">Create an account</Link>
         </p>
-      </section>
+      </Card>
     </main>
   );
 }

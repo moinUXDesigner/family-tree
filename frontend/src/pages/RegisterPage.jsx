@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { UserPlus } from 'lucide-react';
+import { Mail, ShieldCheck, User, UserPlus } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLE_HOME, ROLES } from '../config/roles.js';
+import { Alert, Button, Card, Input } from '../app/components';
 
 export function RegisterPage() {
   const { isAuthenticated, register, user } = useAuth();
@@ -32,7 +33,10 @@ export function RegisterPage() {
 
   return (
     <main className="auth-page">
-      <section className="auth-panel">
+      <Card className="auth-panel" padding="lg" variant="elevated">
+        <div className="brand-mark">
+          <UserPlus aria-hidden="true" />
+        </div>
         <p className="eyebrow">End User Registration</p>
         <h1>Create your family member account</h1>
         <p className="auth-copy">
@@ -40,51 +44,52 @@ export function RegisterPage() {
         </p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
-          <label>
-            Full name
-            <input
-              autoComplete="name"
-              value={form.name}
-              onChange={(event) => setForm({ ...form, name: event.target.value })}
-              required
-            />
-          </label>
+          <Input
+            autoComplete="name"
+            label="Full name"
+            leftIcon={<User aria-hidden="true" size={18} />}
+            value={form.name}
+            onChange={(event) => setForm({ ...form, name: event.target.value })}
+            required
+            fullWidth
+          />
 
-          <label>
-            Email
-            <input
-              autoComplete="email"
-              type="email"
-              value={form.email}
-              onChange={(event) => setForm({ ...form, email: event.target.value })}
-              required
-            />
-          </label>
+          <Input
+            autoComplete="email"
+            label="Email"
+            leftIcon={<Mail aria-hidden="true" size={18} />}
+            type="email"
+            value={form.email}
+            onChange={(event) => setForm({ ...form, email: event.target.value })}
+            required
+            fullWidth
+          />
 
-          <label>
-            Password
-            <input
-              autoComplete="new-password"
-              minLength={8}
-              type="password"
-              value={form.password}
-              onChange={(event) => setForm({ ...form, password: event.target.value })}
-              required
-            />
-          </label>
+          <Input
+            autoComplete="new-password"
+            helperText="Use at least 8 characters."
+            label="Password"
+            leftIcon={<ShieldCheck aria-hidden="true" size={18} />}
+            minLength={8}
+            type="password"
+            value={form.password}
+            onChange={(event) => setForm({ ...form, password: event.target.value })}
+            required
+            fullWidth
+          />
 
-          {error ? <p className="form-error">{error}</p> : null}
+          {error ? <Alert variant="error">{error}</Alert> : null}
 
-          <button className="primary-action" disabled={isSubmitting} type="submit">
+          <Button disabled={isSubmitting} fullWidth isLoading={isSubmitting} type="submit">
             <UserPlus aria-hidden="true" />
-            {isSubmitting ? 'Creating account...' : 'Create account'}
-          </button>
+            Create account
+          </Button>
         </form>
 
         <p className="auth-switch">
           Already have access? <Link to="/login">Sign in</Link>
         </p>
-      </section>
+      </Card>
     </main>
   );
 }

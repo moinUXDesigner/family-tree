@@ -1,6 +1,7 @@
 import { LogOut, ShieldCheck, TreePine, UsersRound } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLE_LABELS, ROLES } from '../config/roles.js';
+import { Badge, Button, Card, StatCard } from '../app/components';
 
 const dashboardConfig = {
   [ROLES.SUPER_ADMIN]: {
@@ -59,35 +60,37 @@ export function DashboardPage({ role }) {
       <section className="dashboard-content">
         <header className="dashboard-header">
           <div>
-            <p className="eyebrow">{ROLE_LABELS[user.role]}</p>
+            <Badge variant="primary">{ROLE_LABELS[user.role]}</Badge>
             <h1>{config.title}</h1>
             <p>{config.subtitle}</p>
           </div>
-          <button className="secondary-action" onClick={logout} type="button">
+          <Button onClick={logout} type="button" variant="outline">
             <LogOut aria-hidden="true" />
             Logout
-          </button>
+          </Button>
         </header>
 
-        <section className="identity-strip">
+        <Card className="identity-strip" padding="md" variant="bordered">
           <ShieldCheck aria-hidden="true" />
           <div>
             <span>Signed in as</span>
             <strong>{user.name}</strong>
             <small>{user.email}</small>
           </div>
-        </section>
+        </Card>
 
         <section className="metric-grid" aria-label="Role access summary">
-          {config.stats.map(([label, value]) => (
-            <article className="metric-card" key={label}>
-              <span>{label}</span>
-              <strong>{value}</strong>
-            </article>
+          {config.stats.map(([label, value], index) => (
+            <StatCard
+              color={['primary', 'secondary', 'teal'][index] ?? 'primary'}
+              key={label}
+              title={label}
+              value={value}
+            />
           ))}
         </section>
 
-        <section className="next-work">
+        <Card className="next-work" padding="lg" variant="elevated">
           <UsersRound aria-hidden="true" />
           <div>
             <h2>Next module</h2>
@@ -95,7 +98,7 @@ export function DashboardPage({ role }) {
               Family and member management will plug into this authenticated shell next.
             </p>
           </div>
-        </section>
+        </Card>
       </section>
     </main>
   );
