@@ -108,4 +108,12 @@ jobs:
         run: |
           ssh -i ~/.ssh/hostinger_key -p "${{ secrets.HOSTINGER_SSH_PORT }}" \
             "${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}" \
-            "cd '${{ secrets.HOSTINGER_BACKEND_PATH }}' && if command -v composer >/dev/null 2>&1; then composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction; fi && php artisan migrate --force && (php artisan storage:link || true) && php artisan config:cache && php artisan route:cache && php artisan view:cache"
+            "cd '${{ secrets.HOSTINGER_BACKEND_PATH }}' && \
+            PHP_BIN='/opt/alt/php84/usr/bin/php' && \
+            if [ ! -x \"\$PHP_BIN\" ]; then echo 'PHP 8.4 binary not found at /opt/alt/php84/usr/bin/php. Set the Hostinger API subdomain and SSH PHP version to PHP 8.4.'; exit 1; fi && \
+            \"\$PHP_BIN\" -v && \
+            \"\$PHP_BIN\" artisan migrate --force && \
+            (\"\$PHP_BIN\" artisan storage:link || true) && \
+            \"\$PHP_BIN\" artisan config:cache && \
+            \"\$PHP_BIN\" artisan route:cache && \
+            \"\$PHP_BIN\" artisan view:cache"

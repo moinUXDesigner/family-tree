@@ -34,6 +34,12 @@ The API subdomain document root must point to:
 /home/u484303972/domains/khajamynuddin.com/public_html/api-familytree/public
 ```
 
+The API subdomain and SSH runtime must use PHP 8.4. On Hostinger shared hosting the PHP 8.4 CLI binary is expected at:
+
+```text
+/opt/alt/php84/usr/bin/php
+```
+
 ## Production URLs
 
 ```text
