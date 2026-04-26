@@ -20,7 +20,7 @@ Backend local env:
 
 ```env
 APP_URL=http://localhost:8000
-FRONTEND_URL=http://localhost:5173
+FRONTEND_URL=http://localhost:5173,http://127.0.0.1:5173
 SANCTUM_STATEFUL_DOMAINS=localhost:5173,127.0.0.1:5173
 DB_HOST=mariadb
 DB_DATABASE=family_tree
