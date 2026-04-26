@@ -16,6 +16,7 @@ docker/     Local PHP configuration for Docker development
 Frontend: http://localhost:5173
 Backend:  http://localhost:8000
 MariaDB:  localhost:3306
+phpMyAdmin: http://localhost:8080
 ```
 
 ## Production URLs
@@ -29,6 +30,7 @@ API:      https://api-familytree.khajamynuddin.com/api/v1
 
 - Frontend foundation is scaffolded.
 - Local Docker services are defined for Laravel PHP 8.4 + MariaDB.
+- phpMyAdmin is available locally for browsing the database.
 - Hostinger shared-hosting paths are documented.
 - Laravel app creation is the next backend setup step.
 

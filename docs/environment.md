@@ -6,6 +6,7 @@
 React Vite: http://localhost:5173
 Laravel API: http://localhost:8000
 MariaDB:     localhost:3306
+phpMyAdmin:  http://localhost:8080
 ```
 
 Frontend local env:

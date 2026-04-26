@@ -34,6 +34,21 @@ services:
         condition: service_healthy
     command: sh -c "php artisan serve --host=0.0.0.0 --port=8000"
 
+  phpmyadmin:
+    image: phpmyadmin:5.2
+    container_name: familytree-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mariadb
+      PMA_PORT: 3306
+      PMA_USER: family_user
+      PMA_PASSWORD: family_password
+      UPLOAD_LIMIT: 128M
+    ports:
+      - "8080:80"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
 volumes:
   mariadb_data:
-
