@@ -26,6 +26,10 @@ Frontend: https://familytree.khajamynuddin.com
 API:      https://api-familytree.khajamynuddin.com/api/v1
 ```
 
+## Deployment
+
+Deployment is handled by GitHub Actions over SSH. See `docs/deployment.md`.
+
 ## Phase 1 Status
 
 - Frontend foundation is scaffolded.
