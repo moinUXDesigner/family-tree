@@ -34,6 +34,8 @@ The API subdomain document root must point to:
 /home/u484303972/domains/khajamynuddin.com/public_html/api-familytree/public
 ```
 
+If Hostinger is temporarily pointing the API subdomain to `api-familytree` instead of `api-familytree/public`, the root `backend/.htaccess` rewrites requests into `public/` as a fallback. The preferred production setup is still to set the subdomain document root directly to `public`.
+
 The API subdomain and SSH runtime must use PHP 8.4. On Hostinger shared hosting the PHP 8.4 CLI binary is expected at:
 
 ```text
