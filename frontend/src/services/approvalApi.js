@@ -7,7 +7,7 @@ export const approvalApi = {
   },
 
   async updateRequest(token, userId, approvalStatus) {
-    const response = await apiClient.put(
+    const response = await apiClient.post(
       `/approval-requests/${userId}`,
       { approval_status: approvalStatus },
       token,

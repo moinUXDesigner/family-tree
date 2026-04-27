@@ -47,6 +47,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/families', [FamilyController::class, 'store']);
             Route::delete('/families/{family}', [FamilyController::class, 'destroy']);
             Route::get('/approval-requests', [UserApprovalController::class, 'index']);
+            Route::post('/approval-requests/{user}', [UserApprovalController::class, 'update']);
             Route::put('/approval-requests/{user}', [UserApprovalController::class, 'update']);
             Route::get('/root-family', [RootFamilyController::class, 'show']);
             Route::post('/root-family/members', [RootFamilyController::class, 'storeMember']);

@@ -17,8 +17,9 @@ class UserApprovalController extends Controller
         $status = $request->query('status', User::APPROVAL_PENDING);
 
         $users = User::query()
-            ->with('family:id,name')
+            ->with(['family:id,name', 'familyMember:id,user_id,notes'])
             ->where('role', User::ROLE_USER)
+            ->whereHas('familyMember')
             ->when($status !== 'all', fn ($query) => $query->where('approval_status', $status))
             ->latest()
             ->get()
@@ -45,6 +46,10 @@ class UserApprovalController extends Controller
 
         abort_if(! $user->hasRole(User::ROLE_USER), 422, 'Only end users require approval.');
 
+        $member = $user->familyMember()->first();
+
+        abort_if(! $member || ! $user->family_id, 422, 'User must connect to the family tree before approval.');
+
         $user->forceFill(['approval_status' => $data['approval_status']])->save();
 
         return response()->json([
@@ -61,9 +66,7 @@ class UserApprovalController extends Controller
      */
     private function userPayload(User $user): array
     {
-        $member = FamilyMember::query()
-            ->where('user_id', $user->id)
-            ->first(['id', 'notes']);
+        $member = $user->familyMember ?? $user->familyMember()->first(['id', 'notes']);
         $relationship = $this->relationshipToRoot($member?->notes);
 
         return [
