@@ -45,8 +45,26 @@ const emptyForm = {
   phone: '',
   current_city: '',
   current_country: '',
-  notes: '',
+  family_head_id: '',
+  relationship_to_family_head: '',
+  marital_status: 'unmarried',
 };
+
+const relationshipOptions = [
+  ['father', 'Father'],
+  ['mother', 'Mother'],
+  ['son', 'Son'],
+  ['daughter', 'Daughter'],
+  ['child', 'Child'],
+  ['husband', 'Husband'],
+  ['wife', 'Wife'],
+  ['spouse', 'Spouse'],
+  ['brother', 'Brother'],
+  ['sister', 'Sister'],
+  ['sibling', 'Sibling'],
+  ['guardian', 'Guardian'],
+  ['ward', 'Ward'],
+];
 
 export function MembersPage({ role }) {
   const { logout, token, user } = useAuth();
@@ -122,17 +140,22 @@ export function MembersPage({ role }) {
     setIsSubmitting(true);
 
     try {
-      const member = await familyApi.createMember(token, {
+      const result = await familyApi.createMember(token, {
         ...form,
         family_id: Number(selectedFamilyId),
+        family_head_id: form.family_head_id ? Number(form.family_head_id) : null,
         is_living: true,
         is_private: false,
       });
+      const member = result.member;
 
       setMembers((current) => [...current, member].sort(sortMembers));
+      if (result.family) {
+        setFamilies((current) => [...current, result.family].sort(sortFamilies));
+      }
       setDirectoryFamilyId(selectedFamilyId);
       setForm({ ...emptyForm, family_id: selectedFamilyId });
-      setSuccess('Family member added.');
+      setSuccess(result.family ? `Family member added. ${result.family.name} was created.` : 'Family member added.');
       setIsAddingMember(false);
     } catch (submitError) {
       setError(submitError.message);
@@ -242,7 +265,7 @@ export function MembersPage({ role }) {
             <div className="section-heading">
               <div>
                 <h2>Add member</h2>
-                <p>Capture a clean first profile. Relationships come in the next phase.</p>
+                <p>Capture the member profile and attach the first relationship to the family head.</p>
               </div>
               <Button onClick={hideAddMemberForm} type="button" variant="outline">
                 Cancel
@@ -328,17 +351,59 @@ export function MembersPage({ role }) {
                 onChange={(event) => updateForm('current_country', event.target.value)}
                 fullWidth
               />
-              <label className="field-group member-form-wide">
-                Notes
-                <textarea
-                  value={form.notes}
-                  onChange={(event) => updateForm('notes', event.target.value)}
-                  rows={3}
-                />
+
+              <label className="field-group">
+                Select Family Head
+                <select
+                  value={form.family_head_id}
+                  onChange={(event) => updateForm('family_head_id', event.target.value)}
+                  required
+                >
+                  <option value="">Select family head</option>
+                  {members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.display_name}
+                    </option>
+                  ))}
+                </select>
               </label>
+
+              <label className="field-group">
+                Relation to Family Head
+                <select
+                  value={form.relationship_to_family_head}
+                  onChange={(event) => updateForm('relationship_to_family_head', event.target.value)}
+                  required
+                >
+                  <option value="">Select relation</option>
+                  {relationshipOptions.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field-group member-form-wide">
+                Married / Unmarried
+                <select
+                  value={form.marital_status}
+                  onChange={(event) => updateForm('marital_status', event.target.value)}
+                  required
+                >
+                  <option value="unmarried">Unmarried</option>
+                  <option value="married">Married</option>
+                </select>
+              </label>
+
               <Button
                 className="member-form-action"
-                disabled={isSubmitting || !selectedFamilyId}
+                disabled={
+                  isSubmitting ||
+                  !selectedFamilyId ||
+                  !form.family_head_id ||
+                  !form.relationship_to_family_head
+                }
                 isLoading={isSubmitting}
                 type="submit"
               >
@@ -418,6 +483,10 @@ export function MembersPage({ role }) {
 
 function sortMembers(first, second) {
   return first.display_name.localeCompare(second.display_name);
+}
+
+function sortFamilies(first, second) {
+  return first.name.localeCompare(second.name);
 }
 
 function initials(name) {

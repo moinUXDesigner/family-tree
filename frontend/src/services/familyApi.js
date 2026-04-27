@@ -23,7 +23,7 @@ export const familyApi = {
 
   async createMember(token, payload) {
     const response = await apiClient.post('/family-members', payload, token);
-    return response.data.member;
+    return response.data;
   },
 
   async updateMember(token, memberId, payload) {
