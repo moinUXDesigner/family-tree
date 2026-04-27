@@ -51,6 +51,7 @@ return [
             'driver' => 'local',
             'root' => storage_path('app/private/user-uploads/photos'),
             'serve' => true,
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage/user-photos',
             'throw' => false,
             'report' => false,
         ],
@@ -58,7 +59,7 @@ return [
         'user_documents' => [
             'driver' => 'local',
             'root' => storage_path('app/private/user-uploads/documents'),
-            'serve' => true,
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],
@@ -66,7 +67,7 @@ return [
         'user_files' => [
             'driver' => 'local',
             'root' => storage_path('app/private/user-uploads/files'),
-            'serve' => true,
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],
