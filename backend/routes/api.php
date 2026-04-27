@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\FamilyMemberController;
 use App\Http\Controllers\Api\FamilyRelationshipController;
 use App\Http\Controllers\Api\FamilyTreeController;
 use App\Http\Controllers\Api\RootFamilyController;
+use App\Http\Controllers\Api\UserApprovalController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -44,6 +45,9 @@ Route::prefix('v1')->group(function (): void {
 
         Route::middleware('role:super_admin')->group(function (): void {
             Route::post('/families', [FamilyController::class, 'store']);
+            Route::delete('/families/{family}', [FamilyController::class, 'destroy']);
+            Route::get('/approval-requests', [UserApprovalController::class, 'index']);
+            Route::put('/approval-requests/{user}', [UserApprovalController::class, 'update']);
             Route::get('/root-family', [RootFamilyController::class, 'show']);
             Route::post('/root-family/members', [RootFamilyController::class, 'storeMember']);
         });

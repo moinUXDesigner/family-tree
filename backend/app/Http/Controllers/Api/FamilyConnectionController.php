@@ -62,6 +62,7 @@ class FamilyConnectionController extends Controller
             'message' => 'Family connection status loaded.',
             'data' => [
                 'is_connected' => (bool) $member,
+                'approval_status' => $request->user()->approval_status,
                 'member' => $member ? [
                     'id' => $member->id,
                     'display_name' => trim("{$member->first_name} {$member->last_name}"),
@@ -69,6 +70,7 @@ class FamilyConnectionController extends Controller
                     'family_name' => $member->family?->name,
                 ] : null,
                 'root_member_name' => $this->rootMemberName(),
+                'root_couple' => $this->rootCouplePayload($request->user()),
                 'relationships' => self::RELATIONSHIPS,
             ],
         ]);
@@ -111,6 +113,7 @@ class FamilyConnectionController extends Controller
                     'id' => $rootMember->id,
                     'display_name' => $this->rootMemberName(),
                 ],
+                'approval_status' => $user->approval_status,
             ],
         ]);
     }
@@ -232,5 +235,49 @@ class FamilyConnectionController extends Controller
     private function rootMemberName(): string
     {
         return self::ROOT_FIRST_NAME.' '.self::ROOT_LAST_NAME;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function rootCouplePayload(User $user): array
+    {
+        $family = $this->rootFamily();
+        $root = $this->rootMember($family, $user);
+        $spouse = $this->rootSpouse($family, $root);
+
+        return [
+            'root_member' => [
+                'id' => $root->id,
+                'display_name' => trim("{$root->first_name} {$root->last_name}"),
+            ],
+            'wife' => $spouse ? [
+                'id' => $spouse->id,
+                'display_name' => trim("{$spouse->first_name} {$spouse->last_name}"),
+            ] : null,
+        ];
+    }
+
+    private function rootSpouse(Family $family, FamilyMember $root): ?FamilyMember
+    {
+        $relationship = FamilyRelationship::query()
+            ->where('family_id', $family->id)
+            ->where('relationship_type', FamilyRelationship::TYPE_SPOUSE)
+            ->where(function ($query) use ($root): void {
+                $query
+                    ->where('from_member_id', $root->id)
+                    ->orWhere('to_member_id', $root->id);
+            })
+            ->first();
+
+        if (! $relationship) {
+            return null;
+        }
+
+        $spouseId = $relationship->from_member_id === $root->id
+            ? $relationship->to_member_id
+            : $relationship->from_member_id;
+
+        return FamilyMember::query()->find($spouseId);
     }
 }

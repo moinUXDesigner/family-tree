@@ -70,6 +70,14 @@ export function FamilyConnectionPage() {
 
         setStatus(nextStatus);
         setRelationship(nextStatus.relationships?.[0] ?? fallbackRelationships[0]);
+
+        if (
+          nextStatus.is_connected &&
+          nextStatus.approval_status === 'approved' &&
+          !sessionStorage.getItem('familyTreeInstallPromptShown')
+        ) {
+          setShowInstallPrompt(true);
+        }
       } catch (loadError) {
         if (isMounted) {
           setError(loadError.message);
@@ -98,16 +106,18 @@ export function FamilyConnectionPage() {
     setIsSubmitting(true);
 
     try {
-      await familyConnectionApi.connect(token, {
+      const result = await familyConnectionApi.connect(token, {
         connection_type: connectionType,
         family_id: connectionType === 'family_id' ? Number(familyId) : null,
         relationship_to_root: relationship,
       });
 
-      if (connectionType === 'root_member') {
+      const nextStatus = await familyConnectionApi.status(token);
+      setStatus(nextStatus);
+
+      if (result.approval_status === 'approved') {
+        sessionStorage.setItem('familyTreeInstallPromptShown', 'true');
         setShowInstallPrompt(true);
-      } else {
-        navigate('/app/dashboard', { replace: true });
       }
     } catch (connectError) {
       setError(connectError.message);
@@ -120,7 +130,10 @@ export function FamilyConnectionPage() {
     <main className="connect-page">
       <PwaInstallPrompt
         isOpen={showInstallPrompt}
-        onClose={() => navigate('/app/dashboard', { replace: true })}
+        onClose={() => {
+          sessionStorage.setItem('familyTreeInstallPromptShown', 'true');
+          navigate('/app/dashboard', { replace: true });
+        }}
       />
 
       <Card className="connect-panel" padding="lg" variant="elevated">
@@ -143,12 +156,32 @@ export function FamilyConnectionPage() {
 
         {error ? <Alert variant="error">{error}</Alert> : null}
         {!error && status?.is_connected ? (
-          <Alert variant="success">
-            Connected as {status.member?.display_name} in {status.member?.family_name}.
+          <Alert variant={status.approval_status === 'approved' ? 'success' : 'info'}>
+            {status.approval_status === 'approved'
+              ? `Connected as ${status.member?.display_name} in ${status.member?.family_name}.`
+              : status.approval_status === 'rejected'
+                ? `Your request for ${status.member?.family_name} was rejected. Contact the Super Admin for access.`
+                : `Request sent for ${status.member?.family_name}. Super Admin approval is required before dashboard access.`}
           </Alert>
         ) : null}
 
-        <form className="connect-form" onSubmit={handleSubmit}>
+        {status?.is_connected && status.approval_status !== 'approved' ? (
+          <Card padding="md" variant="bordered">
+            <div className="section-heading">
+              <div>
+                <h2>{status.approval_status === 'rejected' ? 'Access not approved' : 'Waiting for approval'}</h2>
+                <p>
+                  {status.approval_status === 'rejected'
+                    ? 'Your account is connected, but family access is not approved right now.'
+                    : `Your account is connected to ${status.member?.family_name}. A Super Admin must approve your access request before member lists, tree, and links become available.`}
+                </p>
+              </div>
+            </div>
+          </Card>
+        ) : null}
+
+        {!status?.is_connected ? (
+          <form className="connect-form" onSubmit={handleSubmit}>
           <div className="connect-choice-grid" role="radiogroup" aria-label="Connection type">
             <label className={connectionType === 'root_member' ? 'connect-choice active' : 'connect-choice'}>
               <input
@@ -213,18 +246,19 @@ export function FamilyConnectionPage() {
             <Link2 aria-hidden="true" />
             Connect and continue
           </Button>
+          </form>
+        ) : null}
 
-          {status?.is_connected ? (
-            <Button
-              fullWidth
-              onClick={() => navigate('/app/dashboard', { replace: true })}
-              type="button"
-              variant="outline"
-            >
-              Continue to dashboard
-            </Button>
-          ) : null}
-        </form>
+        {status?.is_connected && status.approval_status === 'approved' ? (
+          <Button
+            fullWidth
+            onClick={() => navigate('/app/dashboard', { replace: true })}
+            type="button"
+            variant="outline"
+          >
+            Continue to dashboard
+          </Button>
+        ) : null}
       </Card>
     </main>
   );

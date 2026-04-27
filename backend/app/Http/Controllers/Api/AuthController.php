@@ -26,6 +26,7 @@ class AuthController extends Controller
             'email' => $data['email'],
             'password' => $data['password'],
             'role' => User::ROLE_USER,
+            'approval_status' => User::APPROVAL_PENDING,
             'is_active' => true,
         ]);
 
@@ -105,6 +106,7 @@ class AuthController extends Controller
             'email' => $user->email,
             'role' => $user->role,
             'family_id' => $user->family_id,
+            'approval_status' => $user->approval_status,
             'is_active' => $user->is_active,
         ];
     }

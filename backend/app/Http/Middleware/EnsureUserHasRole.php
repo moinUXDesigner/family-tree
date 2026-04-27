@@ -20,6 +20,14 @@ class EnsureUserHasRole
             ], 403);
         }
 
+        if ($user->hasRole('user') && ! $user->isApproved() && ! $request->is('api/v1/family-connection*')) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Your family access request is waiting for Super Admin approval.',
+                'data' => null,
+            ], 403);
+        }
+
         return $next($request);
     }
 }

@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -136,6 +137,7 @@ class FamilyMemberController extends Controller
             'gender' => ['nullable', 'string', 'max:32'],
             'birth_date' => ['nullable', 'date'],
             'death_date' => ['nullable', 'date', 'after_or_equal:birth_date'],
+            'photo_path' => ['nullable', 'string', 'max:2048'],
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'current_city' => ['nullable', 'string', 'max:255'],
@@ -162,6 +164,8 @@ class FamilyMemberController extends Controller
             'gender' => $member->gender,
             'birth_date' => $member->birth_date?->format('Y-m-d'),
             'death_date' => $member->death_date?->format('Y-m-d'),
+            'photo_path' => $member->photo_path,
+            'photo_url' => $member->photo_path ? Storage::disk('user_photos')->url($member->photo_path) : null,
             'email' => $member->email,
             'phone' => $member->phone,
             'current_city' => $member->current_city,

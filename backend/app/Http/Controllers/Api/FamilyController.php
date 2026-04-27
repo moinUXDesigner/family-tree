@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 
 class FamilyController extends Controller
 {
@@ -59,6 +60,19 @@ class FamilyController extends Controller
                 'family' => $this->familyPayload($family->loadCount('members')),
             ],
         ], 201);
+    }
+
+    public function destroy(Family $family): JsonResponse
+    {
+        abort_if($family->slug === 'shaik-nanne-saheb-family', Response::HTTP_UNPROCESSABLE_ENTITY, 'The Nanne Saheb root family cannot be deleted.');
+
+        $family->delete();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Family deleted.',
+            'data' => null,
+        ]);
     }
 
     /**

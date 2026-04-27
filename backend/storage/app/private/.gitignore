@@ -1,2 +1,9 @@
 *
 !.gitignore
+!user-uploads/
+!user-uploads/photos/
+!user-uploads/photos/.gitkeep
+!user-uploads/documents/
+!user-uploads/documents/.gitkeep
+!user-uploads/files/
+!user-uploads/files/.gitkeep

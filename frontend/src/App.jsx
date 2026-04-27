@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { RegisterPage } from './pages/RegisterPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
+import { FamiliesPage } from './pages/FamiliesPage.jsx';
 import { FamilyConnectionPage } from './pages/FamilyConnectionPage.jsx';
 import { MembersPage } from './pages/MembersPage.jsx';
 import { RelationshipsPage } from './pages/RelationshipsPage.jsx';
@@ -45,6 +46,7 @@ export function App() {
             path="/super-admin/members"
             element={<MembersPage role={ROLES.SUPER_ADMIN} />}
           />
+          <Route path="/super-admin/families" element={<FamiliesPage />} />
           <Route
             path="/super-admin/relationships"
             element={<RelationshipsPage role={ROLES.SUPER_ADMIN} />}

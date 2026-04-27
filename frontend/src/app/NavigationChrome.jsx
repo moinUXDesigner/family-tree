@@ -7,6 +7,7 @@ import {
   Group,
   Menu,
   PeopleAlt,
+  RecentActors,
 } from '@mui/icons-material';
 import {
   BottomNavigation,
@@ -57,6 +58,15 @@ const navItems = [
       [ROLES.SUPER_ADMIN]: '/super-admin/tree',
       [ROLES.ADMIN]: '/admin/tree',
       [ROLES.USER]: '/app/tree',
+    },
+  },
+  {
+    key: 'families',
+    label: 'Families',
+    icon: <RecentActors />,
+    roles: [ROLES.SUPER_ADMIN],
+    route: {
+      [ROLES.SUPER_ADMIN]: '/super-admin/families',
     },
   },
   {

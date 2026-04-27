@@ -47,6 +47,30 @@ return [
             'report' => false,
         ],
 
+        'user_photos' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/user-uploads/photos'),
+            'serve' => true,
+            'throw' => false,
+            'report' => false,
+        ],
+
+        'user_documents' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/user-uploads/documents'),
+            'serve' => true,
+            'throw' => false,
+            'report' => false,
+        ],
+
+        'user_files' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/user-uploads/files'),
+            'serve' => true,
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

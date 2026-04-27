@@ -56,6 +56,7 @@ class DatabaseSeeder extends Seeder
                     'password' => 'password123',
                     'role' => $user['role'],
                     'family_id' => $user['family_id'],
+                    'approval_status' => User::APPROVAL_APPROVED,
                     'is_active' => true,
                 ],
             );

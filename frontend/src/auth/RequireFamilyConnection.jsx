@@ -5,7 +5,7 @@ import { useAuth } from './useAuth.js';
 
 export function RequireFamilyConnection() {
   const { token } = useAuth();
-  const [isConnected, setIsConnected] = useState(null);
+  const [status, setStatus] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -14,12 +14,12 @@ export function RequireFamilyConnection() {
       .status(token)
       .then((status) => {
         if (isMounted) {
-          setIsConnected(status.is_connected);
+          setStatus(status);
         }
       })
       .catch(() => {
         if (isMounted) {
-          setIsConnected(false);
+          setStatus({ is_connected: false, approval_status: 'pending' });
         }
       });
 
@@ -28,11 +28,11 @@ export function RequireFamilyConnection() {
     };
   }, [token]);
 
-  if (isConnected === null) {
+  if (status === null) {
     return <div className="screen-loader">Checking family connection...</div>;
   }
 
-  if (!isConnected) {
+  if (!status.is_connected || status.approval_status !== 'approved') {
     return <Navigate to="/app/connect" replace />;
   }
 

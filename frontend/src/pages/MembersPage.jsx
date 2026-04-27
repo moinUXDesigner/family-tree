@@ -58,9 +58,10 @@ export function MembersPage({ role }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddingMember, setIsAddingMember] = useState(false);
+  const [directoryFamilyId, setDirectoryFamilyId] = useState('');
 
   const canDeleteMembers = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
-  const selectedFamilyId = form.family_id || families[0]?.id || user.family_id || '';
+  const selectedFamilyId = form.family_id || directoryFamilyId || families[0]?.id || user.family_id || '';
 
   const stats = useMemo(() => {
     const livingCount = members.filter((member) => member.is_living).length;
@@ -91,6 +92,7 @@ export function MembersPage({ role }) {
 
         setFamilies(nextFamilies);
         setMembers(nextMembers);
+        setDirectoryFamilyId(firstFamilyId);
         setForm((current) => ({
           ...current,
           family_id: current.family_id || firstFamilyId,
@@ -128,6 +130,7 @@ export function MembersPage({ role }) {
       });
 
       setMembers((current) => [...current, member].sort(sortMembers));
+      setDirectoryFamilyId(selectedFamilyId);
       setForm({ ...emptyForm, family_id: selectedFamilyId });
       setSuccess('Family member added.');
       setIsAddingMember(false);
@@ -148,6 +151,23 @@ export function MembersPage({ role }) {
       setSuccess('Family member removed.');
     } catch (deleteError) {
       setError(deleteError.message);
+    }
+  }
+
+  async function handleDirectoryFamilyChange(nextFamilyId) {
+    setDirectoryFamilyId(nextFamilyId);
+    setForm((current) => ({ ...current, family_id: nextFamilyId }));
+    setError('');
+    setSuccess('');
+    setIsLoading(true);
+
+    try {
+      const nextMembers = await familyApi.listMembers(token, nextFamilyId);
+      setMembers(nextMembers);
+    } catch (loadError) {
+      setError(loadError.message);
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -198,6 +218,24 @@ export function MembersPage({ role }) {
             </Card>
           ))}
         </section>
+
+        {role === ROLES.SUPER_ADMIN && families.length > 1 && !isAddingMember ? (
+          <Card padding="md" variant="bordered">
+            <label className="field-group tree-family-select">
+              Family
+              <select
+                value={directoryFamilyId}
+                onChange={(event) => handleDirectoryFamilyChange(event.target.value)}
+              >
+                {families.map((family) => (
+                  <option key={family.id} value={family.id}>
+                    {family.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </Card>
+        ) : null}
 
         {isAddingMember ? (
           <Card padding="lg" variant="bordered">
@@ -326,7 +364,11 @@ export function MembersPage({ role }) {
             {members.map((member) => (
               <article className="member-row" key={member.id}>
                 <div className="member-avatar" aria-hidden="true">
-                  {initials(member.display_name)}
+                  {member.photo_url ? (
+                    <img alt="" src={member.photo_url} />
+                  ) : (
+                    initials(member.display_name)
+                  )}
                 </div>
                 <div className="member-main">
                   <div className="member-title-line">

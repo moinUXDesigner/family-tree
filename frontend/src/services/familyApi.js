@@ -6,6 +6,15 @@ export const familyApi = {
     return response.data.families;
   },
 
+  async createFamily(token, payload) {
+    const response = await apiClient.post('/families', payload, token);
+    return response.data.family;
+  },
+
+  async deleteFamily(token, familyId) {
+    await apiClient.delete(`/families/${familyId}`, token);
+  },
+
   async listMembers(token, familyId) {
     const query = familyId ? `?family_id=${familyId}` : '';
     const response = await apiClient.get(`/family-members${query}`, token);
