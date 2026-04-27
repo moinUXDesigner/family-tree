@@ -48,6 +48,7 @@ const emptyForm = {
   family_head_id: '',
   relationship_to_family_head: '',
   marital_status: 'unmarried',
+  living_status: 'living',
 };
 
 const relationshipOptions = [
@@ -144,7 +145,7 @@ export function MembersPage({ role }) {
         ...form,
         family_id: Number(selectedFamilyId),
         family_head_id: form.family_head_id ? Number(form.family_head_id) : null,
-        is_living: true,
+        is_living: form.living_status === 'living',
         is_private: false,
       });
       const member = result.member;
@@ -393,6 +394,18 @@ export function MembersPage({ role }) {
                 >
                   <option value="unmarried">Unmarried</option>
                   <option value="married">Married</option>
+                </select>
+              </label>
+
+              <label className="field-group member-form-wide">
+                Living Status
+                <select
+                  value={form.living_status}
+                  onChange={(event) => updateForm('living_status', event.target.value)}
+                  required
+                >
+                  <option value="living">Living</option>
+                  <option value="deceased">Deceased</option>
                 </select>
               </label>
 
