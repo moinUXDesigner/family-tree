@@ -40,7 +40,7 @@ class FamilyMemberController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $this->validatedMemberData($request);
-        $family = $this->accessibleFamily($request, (int) $data['family_id'], true);
+        $family = $this->accessibleFamily($request, (int) $data['family_id'], false);
 
         $member = FamilyMember::query()->create([
             ...$data,

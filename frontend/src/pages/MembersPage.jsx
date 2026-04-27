@@ -8,7 +8,6 @@ import {
   MapPin,
   Phone,
   Plus,
-  ShieldCheck,
   TreePine,
   UserRound,
   UsersRound,
@@ -59,7 +58,7 @@ export function MembersPage({ role }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const canManageMembers = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
+  const canDeleteMembers = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
   const selectedFamilyId = form.family_id || families[0]?.id || user.family_id || '';
 
   const stats = useMemo(() => {
@@ -205,119 +204,109 @@ export function MembersPage({ role }) {
           ))}
         </section>
 
-        {canManageMembers ? (
-          <Card padding="lg" variant="bordered">
-            <div className="section-heading">
-              <div>
-                <h2>Add member</h2>
-                <p>Capture a clean first profile. Relationships come in the next phase.</p>
-              </div>
-              <Badge variant="secondary">Admin action</Badge>
-            </div>
-
-            <form className="member-form" onSubmit={handleSubmit}>
-              {families.length > 1 ? (
-                <label className="field-group">
-                  Family
-                  <select
-                    value={form.family_id}
-                    onChange={(event) => updateForm('family_id', event.target.value)}
-                    required
-                  >
-                    {families.map((family) => (
-                      <option key={family.id} value={family.id}>
-                        {family.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-
-              <Input
-                label="First name"
-                leftIcon={<UserRound aria-hidden="true" size={18} />}
-                value={form.first_name}
-                onChange={(event) => updateForm('first_name', event.target.value)}
-                required
-                fullWidth
-              />
-              <Input
-                label="Last name"
-                value={form.last_name}
-                onChange={(event) => updateForm('last_name', event.target.value)}
-                fullWidth
-              />
-              <Input
-                label="Birth date"
-                leftIcon={<CalendarDays aria-hidden="true" size={18} />}
-                type="date"
-                value={form.birth_date}
-                onChange={(event) => updateForm('birth_date', event.target.value)}
-                fullWidth
-              />
-              <Input
-                label="Gender"
-                value={form.gender}
-                onChange={(event) => updateForm('gender', event.target.value)}
-                fullWidth
-              />
-              <Input
-                label="Email"
-                leftIcon={<Mail aria-hidden="true" size={18} />}
-                type="email"
-                value={form.email}
-                onChange={(event) => updateForm('email', event.target.value)}
-                fullWidth
-              />
-              <Input
-                label="Phone"
-                leftIcon={<Phone aria-hidden="true" size={18} />}
-                value={form.phone}
-                onChange={(event) => updateForm('phone', event.target.value)}
-                fullWidth
-              />
-              <Input
-                label="City"
-                leftIcon={<MapPin aria-hidden="true" size={18} />}
-                value={form.current_city}
-                onChange={(event) => updateForm('current_city', event.target.value)}
-                fullWidth
-              />
-              <Input
-                label="Country"
-                leftIcon={<Globe2 aria-hidden="true" size={18} />}
-                value={form.current_country}
-                onChange={(event) => updateForm('current_country', event.target.value)}
-                fullWidth
-              />
-              <label className="field-group member-form-wide">
-                Notes
-                <textarea
-                  value={form.notes}
-                  onChange={(event) => updateForm('notes', event.target.value)}
-                  rows={3}
-                />
-              </label>
-              <Button
-                className="member-form-action"
-                disabled={isSubmitting || !selectedFamilyId}
-                isLoading={isSubmitting}
-                type="submit"
-              >
-                <Plus aria-hidden="true" />
-                Add member
-              </Button>
-            </form>
-          </Card>
-        ) : (
-          <Card className="identity-strip" padding="md" variant="bordered">
-            <ShieldCheck aria-hidden="true" />
+        <Card padding="lg" variant="bordered">
+          <div className="section-heading">
             <div>
-              <span>Read-only access</span>
-              <strong>End users can view approved family member records.</strong>
+              <h2>Add member</h2>
+              <p>Capture a clean first profile. Relationships come in the next phase.</p>
             </div>
-          </Card>
-        )}
+            <Badge variant="secondary">Member action</Badge>
+          </div>
+
+          <form className="member-form" onSubmit={handleSubmit}>
+            {families.length > 1 ? (
+              <label className="field-group">
+                Family
+                <select
+                  value={form.family_id}
+                  onChange={(event) => updateForm('family_id', event.target.value)}
+                  required
+                >
+                  {families.map((family) => (
+                    <option key={family.id} value={family.id}>
+                      {family.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            <Input
+              label="First name"
+              leftIcon={<UserRound aria-hidden="true" size={18} />}
+              value={form.first_name}
+              onChange={(event) => updateForm('first_name', event.target.value)}
+              required
+              fullWidth
+            />
+            <Input
+              label="Last name"
+              value={form.last_name}
+              onChange={(event) => updateForm('last_name', event.target.value)}
+              fullWidth
+            />
+            <Input
+              label="Birth date"
+              leftIcon={<CalendarDays aria-hidden="true" size={18} />}
+              type="date"
+              value={form.birth_date}
+              onChange={(event) => updateForm('birth_date', event.target.value)}
+              fullWidth
+            />
+            <Input
+              label="Gender"
+              value={form.gender}
+              onChange={(event) => updateForm('gender', event.target.value)}
+              fullWidth
+            />
+            <Input
+              label="Email"
+              leftIcon={<Mail aria-hidden="true" size={18} />}
+              type="email"
+              value={form.email}
+              onChange={(event) => updateForm('email', event.target.value)}
+              fullWidth
+            />
+            <Input
+              label="Phone"
+              leftIcon={<Phone aria-hidden="true" size={18} />}
+              value={form.phone}
+              onChange={(event) => updateForm('phone', event.target.value)}
+              fullWidth
+            />
+            <Input
+              label="City"
+              leftIcon={<MapPin aria-hidden="true" size={18} />}
+              value={form.current_city}
+              onChange={(event) => updateForm('current_city', event.target.value)}
+              fullWidth
+            />
+            <Input
+              label="Country"
+              leftIcon={<Globe2 aria-hidden="true" size={18} />}
+              value={form.current_country}
+              onChange={(event) => updateForm('current_country', event.target.value)}
+              fullWidth
+            />
+            <label className="field-group member-form-wide">
+              Notes
+              <textarea
+                value={form.notes}
+                onChange={(event) => updateForm('notes', event.target.value)}
+                rows={3}
+              />
+            </label>
+            <Button
+              className="member-form-action"
+              disabled={isSubmitting || !selectedFamilyId}
+              isLoading={isSubmitting}
+              type="submit"
+            >
+              <Plus aria-hidden="true" />
+              Add member
+            </Button>
+          </form>
+        </Card>
 
         <Card padding="lg" variant="elevated">
           <div className="section-heading">
@@ -352,7 +341,7 @@ export function MembersPage({ role }) {
                   <Badge variant={member.is_living ? 'success' : 'neutral'}>
                     {member.is_living ? 'Living' : 'Deceased'}
                   </Badge>
-                  {canManageMembers ? (
+                  {canDeleteMembers ? (
                     <button
                       className="text-action danger"
                       onClick={() => handleDelete(member.id)}
