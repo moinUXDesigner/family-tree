@@ -4,6 +4,7 @@ import { GitBranch, Hash, Link2, LogOut, Network } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLES } from '../config/roles.js';
 import { Alert, Badge, Button, Card, Input } from '../app/components';
+import { PwaInstallPrompt } from '../pwa/PwaInstallPrompt.jsx';
 import { familyConnectionApi } from '../services/familyConnectionApi.js';
 
 const fallbackRelationships = [
@@ -46,6 +47,7 @@ export function FamilyConnectionPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
   const relationships = useMemo(
     () => status?.relationships ?? fallbackRelationships,
@@ -102,7 +104,11 @@ export function FamilyConnectionPage() {
         relationship_to_root: relationship,
       });
 
-      navigate('/app/dashboard', { replace: true });
+      if (connectionType === 'root_member') {
+        setShowInstallPrompt(true);
+      } else {
+        navigate('/app/dashboard', { replace: true });
+      }
     } catch (connectError) {
       setError(connectError.message);
     } finally {
@@ -112,6 +118,11 @@ export function FamilyConnectionPage() {
 
   return (
     <main className="connect-page">
+      <PwaInstallPrompt
+        isOpen={showInstallPrompt}
+        onClose={() => navigate('/app/dashboard', { replace: true })}
+      />
+
       <Card className="connect-panel" padding="lg" variant="elevated">
         <header className="connect-header">
           <div className="brand-mark">
