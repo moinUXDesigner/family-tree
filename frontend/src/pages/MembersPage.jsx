@@ -6,6 +6,7 @@ import {
   LogOut,
   Mail,
   MapPin,
+  Pencil,
   Phone,
   Plus,
   UserRound,
@@ -77,9 +78,13 @@ export function MembersPage({ role }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddingMember, setIsAddingMember] = useState(false);
+  const [editingMember, setEditingMember] = useState(null);
   const [directoryFamilyId, setDirectoryFamilyId] = useState('');
 
   const canDeleteMembers = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
+  const canEditMembers = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
+  const isMemberFormOpen = isAddingMember || Boolean(editingMember);
+  const isEditingMember = Boolean(editingMember);
   const selectedFamilyId = form.family_id || directoryFamilyId || families[0]?.id || user.family_id || '';
 
   const stats = useMemo(() => {
@@ -141,13 +146,26 @@ export function MembersPage({ role }) {
     setIsSubmitting(true);
 
     try {
-      const result = await familyApi.createMember(token, {
+      const payload = {
         ...form,
         family_id: Number(selectedFamilyId),
         family_head_id: form.family_head_id ? Number(form.family_head_id) : null,
         is_living: form.living_status === 'living',
         is_private: false,
-      });
+      };
+
+      if (isEditingMember) {
+        const member = await familyApi.updateMember(token, editingMember.id, payload);
+        setMembers((current) => current.map((item) => (item.id === member.id ? member : item)).sort(sortMembers));
+        setDirectoryFamilyId(String(member.family_id));
+        setForm({ ...emptyForm, family_id: String(member.family_id) });
+        setEditingMember(null);
+        setIsAddingMember(false);
+        setSuccess('Family member updated.');
+        return;
+      }
+
+      const result = await familyApi.createMember(token, payload);
       const member = result.member;
 
       setMembers((current) => [...current, member].sort(sortMembers));
@@ -202,13 +220,36 @@ export function MembersPage({ role }) {
   function showAddMemberForm() {
     setError('');
     setSuccess('');
+    setEditingMember(null);
+    setForm({ ...emptyForm, family_id: selectedFamilyId });
     setIsAddingMember(true);
   }
 
   function hideAddMemberForm() {
     setError('');
     setForm({ ...emptyForm, family_id: selectedFamilyId });
+    setEditingMember(null);
     setIsAddingMember(false);
+  }
+
+  function showEditMemberForm(member) {
+    setError('');
+    setSuccess('');
+    setEditingMember(member);
+    setIsAddingMember(false);
+    setForm({
+      ...emptyForm,
+      family_id: String(member.family_id ?? selectedFamilyId),
+      first_name: member.first_name ?? '',
+      last_name: member.last_name ?? '',
+      gender: member.gender ?? '',
+      birth_date: member.birth_date ?? '',
+      email: member.email ?? '',
+      phone: member.phone ?? '',
+      current_city: member.current_city ?? '',
+      current_country: member.current_country ?? '',
+      living_status: member.is_living ? 'living' : 'deceased',
+    });
   }
 
   return (
@@ -243,7 +284,7 @@ export function MembersPage({ role }) {
           ))}
         </section>
 
-        {role === ROLES.SUPER_ADMIN && families.length > 1 && !isAddingMember ? (
+        {role === ROLES.SUPER_ADMIN && families.length > 1 && !isMemberFormOpen ? (
           <Card padding="md" variant="bordered">
             <label className="field-group tree-family-select">
               Family
@@ -261,12 +302,16 @@ export function MembersPage({ role }) {
           </Card>
         ) : null}
 
-        {isAddingMember ? (
+        {isMemberFormOpen ? (
           <Card padding="lg" variant="bordered">
             <div className="section-heading">
               <div>
-                <h2>Add member</h2>
-                <p>Capture the member profile and attach the first relationship to the family head.</p>
+                <h2>{isEditingMember ? 'Edit member' : 'Add member'}</h2>
+                <p>
+                  {isEditingMember
+                    ? 'Update the existing member profile.'
+                    : 'Capture the member profile and attach the first relationship to the family head.'}
+                </p>
               </div>
               <Button onClick={hideAddMemberForm} type="button" variant="outline">
                 Cancel
@@ -358,10 +403,10 @@ export function MembersPage({ role }) {
                 <select
                   value={form.family_head_id}
                   onChange={(event) => updateForm('family_head_id', event.target.value)}
-                  required
+                  required={!isEditingMember}
                 >
                   <option value="">Select family head</option>
-                  {members.map((member) => (
+                  {members.filter((member) => member.id !== editingMember?.id).map((member) => (
                     <option key={member.id} value={member.id}>
                       {member.display_name}
                     </option>
@@ -374,7 +419,7 @@ export function MembersPage({ role }) {
                 <select
                   value={form.relationship_to_family_head}
                   onChange={(event) => updateForm('relationship_to_family_head', event.target.value)}
-                  required
+                  required={!isEditingMember}
                 >
                   <option value="">Select relation</option>
                   {relationshipOptions.map(([value, label]) => (
@@ -414,14 +459,13 @@ export function MembersPage({ role }) {
                 disabled={
                   isSubmitting ||
                   !selectedFamilyId ||
-                  !form.family_head_id ||
-                  !form.relationship_to_family_head
+                  (!isEditingMember && (!form.family_head_id || !form.relationship_to_family_head))
                 }
                 isLoading={isSubmitting}
                 type="submit"
               >
-                <Plus aria-hidden="true" />
-                Add member
+                {isEditingMember ? <Pencil aria-hidden="true" /> : <Plus aria-hidden="true" />}
+                {isEditingMember ? 'Update member' : 'Add member'}
               </Button>
             </form>
           </Card>
@@ -466,6 +510,16 @@ export function MembersPage({ role }) {
                   <Badge variant={member.is_living ? 'success' : 'neutral'}>
                     {member.is_living ? 'Living' : 'Deceased'}
                   </Badge>
+                  {canEditMembers ? (
+                    <button
+                      className="text-action"
+                      onClick={() => showEditMemberForm(member)}
+                      type="button"
+                    >
+                      <Pencil aria-hidden="true" size={16} />
+                      Edit
+                    </button>
+                  ) : null}
                   {canDeleteMembers ? (
                     <button
                       className="text-action danger"
