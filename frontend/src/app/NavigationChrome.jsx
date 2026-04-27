@@ -5,6 +5,7 @@ import {
   Dashboard,
   FamilyRestroom,
   Group,
+  ManageAccounts,
   Menu,
   PeopleAlt,
   RecentActors,
@@ -67,6 +68,15 @@ const navItems = [
     roles: [ROLES.SUPER_ADMIN],
     route: {
       [ROLES.SUPER_ADMIN]: '/super-admin/families',
+    },
+  },
+  {
+    key: 'users',
+    label: 'Users',
+    icon: <ManageAccounts />,
+    roles: [ROLES.SUPER_ADMIN],
+    route: {
+      [ROLES.SUPER_ADMIN]: '/super-admin/users',
     },
   },
   {

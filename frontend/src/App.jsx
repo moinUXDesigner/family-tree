@@ -8,6 +8,7 @@ import { MembersPage } from './pages/MembersPage.jsx';
 import { RelationshipsPage } from './pages/RelationshipsPage.jsx';
 import { RootFamilyPage } from './pages/RootFamilyPage.jsx';
 import { TreePage } from './pages/TreePage.jsx';
+import { UsersPage } from './pages/UsersPage.jsx';
 import { RequireAuth } from './auth/RequireAuth.jsx';
 import { RequireFamilyConnection } from './auth/RequireFamilyConnection.jsx';
 import { RequireRole } from './auth/RequireRole.jsx';
@@ -47,6 +48,7 @@ export function App() {
             element={<MembersPage role={ROLES.SUPER_ADMIN} />}
           />
           <Route path="/super-admin/families" element={<FamiliesPage />} />
+          <Route path="/super-admin/users" element={<UsersPage />} />
           <Route
             path="/super-admin/relationships"
             element={<RelationshipsPage role={ROLES.SUPER_ADMIN} />}

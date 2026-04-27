@@ -581,6 +581,33 @@ p {
   gap: 12px;
 }
 
+.user-tools {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(160px, 220px) minmax(160px, 220px);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.user-row {
+  align-items: start;
+}
+
+.user-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 720px;
+}
+
+.compact-field {
+  min-width: 150px;
+  font-size: 0.78rem;
+}
+
+.compact-field select {
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
 .relationship-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -799,6 +826,7 @@ p {
   .member-form,
   .relationship-form,
   .connect-choice-grid,
+  .user-tools,
   .member-row,
   .relationship-row {
     grid-template-columns: 1fr;
@@ -810,6 +838,16 @@ p {
 
   .member-meta {
     justify-content: space-between;
+  }
+
+  .user-actions {
+    justify-content: stretch;
+    max-width: none;
+  }
+
+  .compact-field,
+  .user-actions button {
+    width: 100%;
   }
 
   .tree-layout {

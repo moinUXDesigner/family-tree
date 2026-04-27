@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\FamilyRelationshipController;
 use App\Http\Controllers\Api\FamilyTreeController;
 use App\Http\Controllers\Api\RootFamilyController;
 use App\Http\Controllers\Api\UserApprovalController;
+use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -49,6 +50,10 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/approval-requests', [UserApprovalController::class, 'index']);
             Route::post('/approval-requests/{user}', [UserApprovalController::class, 'update']);
             Route::put('/approval-requests/{user}', [UserApprovalController::class, 'update']);
+            Route::get('/users', [UserManagementController::class, 'index']);
+            Route::post('/users/{user}', [UserManagementController::class, 'update']);
+            Route::put('/users/{user}', [UserManagementController::class, 'update']);
+            Route::delete('/users/{user}', [UserManagementController::class, 'destroy']);
             Route::get('/root-family', [RootFamilyController::class, 'show']);
             Route::post('/root-family/members', [RootFamilyController::class, 'storeMember']);
         });
