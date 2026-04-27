@@ -7,11 +7,11 @@ import {
   LogOut,
   Plus,
   ShieldCheck,
-  TreePine,
   UsersRound,
 } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLE_HOME, ROLE_LABELS, ROLES } from '../config/roles.js';
+import { NavigationChrome } from '../app/NavigationChrome.jsx';
 import { Alert, Badge, Button, Card } from '../app/components';
 import { familyApi } from '../services/familyApi.js';
 import { relationshipApi } from '../services/relationshipApi.js';
@@ -163,26 +163,7 @@ export function RelationshipsPage({ role }) {
 
   return (
     <main className="dashboard-page">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <TreePine aria-hidden="true" />
-          <span>Family Tree</span>
-        </div>
-        <nav aria-label="Dashboard navigation">
-          <Link className="nav-item" to={ROLE_HOME[role]}>
-            Overview
-          </Link>
-          <Link className="nav-item" to={memberRoutes[role]}>
-            Members
-          </Link>
-          <Link className="nav-item active" to={relationshipRoutes[role]}>
-            Relationships
-          </Link>
-          <Link className="nav-item" to={treeRoutes[role]}>
-            Family Tree
-          </Link>
-        </nav>
-      </aside>
+      <NavigationChrome active="relationships" role={role} />
 
       <section className="dashboard-content">
         <header className="dashboard-header">

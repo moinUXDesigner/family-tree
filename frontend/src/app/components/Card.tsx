@@ -1,4 +1,5 @@
 import { HTMLAttributes, forwardRef } from 'react';
+import MuiCard from '@mui/material/Card';
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   variant?: 'default' | 'bordered' | 'elevated';
@@ -7,29 +8,29 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ variant = 'default', padding = 'md', className = '', children, ...props }, ref) => {
-    const variantStyles = {
-      default: 'bg-card border border-border',
-      bordered: 'bg-card border-2 border-border',
-      elevated: 'bg-card shadow-card',
-    };
-
-    const paddingStyles = {
-      none: '',
-      sm: 'p-3',
-      md: 'p-4',
-      lg: 'p-6',
+    const paddingMap = {
+      none: 0,
+      sm: 1.5,
+      md: 2,
+      lg: 3,
     };
 
     return (
-      <div
+      <MuiCard
         ref={ref}
-        className={`rounded-lg ${variantStyles[variant]} ${paddingStyles[padding]} ${className}`}
+        className={className}
+        elevation={variant === 'elevated' ? 2 : 0}
+        sx={{
+          border: variant === 'elevated' ? 'none' : '1px solid',
+          borderColor: 'divider',
+          p: paddingMap[padding],
+        }}
         {...props}
       >
         {children}
-      </div>
+      </MuiCard>
     );
-  }
+  },
 );
 
 Card.displayName = 'Card';

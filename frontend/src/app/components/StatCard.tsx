@@ -1,4 +1,6 @@
 import { ReactNode } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import { Card } from './Card';
 
 export interface StatCardProps {
@@ -12,40 +14,23 @@ export interface StatCardProps {
   color?: 'primary' | 'secondary' | 'success' | 'warning' | 'purple' | 'teal';
 }
 
-export const StatCard = ({ title, value, icon, trend, color = 'primary' }: StatCardProps) => {
-  const colorStyles = {
-    primary: 'bg-primary-light text-primary',
-    secondary: 'bg-secondary-light text-secondary',
-    success: 'bg-success-light text-success',
-    warning: 'bg-warning-light text-warning',
-    purple: 'bg-purple-light text-purple',
-    teal: 'bg-teal-light text-teal',
-  };
-
-  return (
-    <Card variant="elevated" padding="md">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm text-neutral-600 mb-1">{title}</p>
-          <p className="text-2xl font-semibold text-neutral-900">{value}</p>
-          {trend && (
-            <div className="flex items-center gap-1 mt-2">
-              <span
-                className={`text-xs font-medium ${
-                  trend.direction === 'up' ? 'text-success' : 'text-error'
-                }`}
-              >
-                {trend.direction === 'up' ? '↑' : '↓'} {trend.value}
-              </span>
-            </div>
-          )}
-        </div>
-        {icon && (
-          <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${colorStyles[color]}`}>
-            <div className="text-2xl">{icon}</div>
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-};
+export const StatCard = ({ title, value, icon, trend }: StatCardProps) => (
+  <Card variant="elevated" padding="md">
+    <Box sx={{ alignItems: 'flex-start', display: 'flex', justifyContent: 'space-between' }}>
+      <Box sx={{ flex: 1 }}>
+        <Typography color="text.secondary" variant="body2">
+          {title}
+        </Typography>
+        <Typography color="text.primary" variant="h5">
+          {value}
+        </Typography>
+        {trend ? (
+          <Typography color={trend.direction === 'up' ? 'success.main' : 'error.main'} variant="caption">
+            {trend.direction === 'up' ? 'Up' : 'Down'} {trend.value}
+          </Typography>
+        ) : null}
+      </Box>
+      {icon ? <Box sx={{ color: 'primary.main', fontSize: 28 }}>{icon}</Box> : null}
+    </Box>
+  </Card>
+);

@@ -1,4 +1,5 @@
 import { HTMLAttributes, forwardRef } from 'react';
+import Chip from '@mui/material/Chip';
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info' | 'neutral';
@@ -7,31 +8,28 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 
 export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
   ({ variant = 'primary', size = 'md', className = '', children, ...props }, ref) => {
-    const variantStyles = {
-      primary: 'bg-primary-light text-primary',
-      secondary: 'bg-secondary-light text-secondary',
-      success: 'bg-success-light text-success',
-      warning: 'bg-warning-light text-warning',
-      error: 'bg-error-light text-error',
-      info: 'bg-info-light text-info',
-      neutral: 'bg-neutral-100 text-neutral-700',
-    };
-
-    const sizeStyles = {
-      sm: 'px-2 py-0.5 text-xs',
-      md: 'px-3 py-1 text-sm',
-    };
+    const color = {
+      primary: 'primary',
+      secondary: 'secondary',
+      success: 'success',
+      warning: 'warning',
+      error: 'error',
+      info: 'info',
+      neutral: 'default',
+    }[variant] as 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info' | 'default';
 
     return (
-      <span
+      <Chip
         ref={ref}
-        className={`inline-flex items-center justify-center font-medium rounded-full ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+        className={className}
+        color={color}
+        label={children}
+        size={size === 'sm' ? 'small' : 'small'}
+        variant={variant === 'neutral' ? 'outlined' : 'filled'}
         {...props}
-      >
-        {children}
-      </span>
+      />
     );
-  }
+  },
 );
 
 Badge.displayName = 'Badge';
