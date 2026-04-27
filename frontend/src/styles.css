@@ -30,24 +30,99 @@ a {
 }
 
 .screen-loader,
-.auth-page {
+.auth-page,
+.connect-page {
   display: grid;
   min-height: 100vh;
   place-items: center;
   padding: 24px;
 }
 
-.auth-page {
+.auth-page,
+.connect-page {
   background: #eef2f7;
 }
 
-.auth-panel {
+.auth-panel,
+.connect-panel {
   width: min(100%, 460px);
   border: 1px solid #dce2ea;
   border-radius: 8px;
   background: #ffffff;
   padding: 32px;
   box-shadow: 0 24px 80px rgb(15 23 42 / 14%);
+}
+
+.connect-panel {
+  width: min(100%, 680px);
+}
+
+.connect-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.connect-panel h1 {
+  margin: 14px 0 0;
+  color: #111827;
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.connect-panel p {
+  margin: 12px 0 22px;
+  color: #556070;
+  line-height: 1.6;
+}
+
+.connect-form {
+  display: grid;
+  gap: 16px;
+}
+
+.connect-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.connect-choice {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #dce2ea;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  padding: 16px;
+}
+
+.connect-choice.active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 12%);
+}
+
+.connect-choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.connect-choice svg {
+  width: 24px;
+  height: 24px;
+  color: #2563eb;
+}
+
+.connect-choice span {
+  color: #6b7280;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.connect-choice strong {
+  color: #111827;
 }
 
 .brand-mark {
@@ -660,6 +735,7 @@ p {
 
   .member-form,
   .relationship-form,
+  .connect-choice-grid,
   .member-row,
   .relationship-row {
     grid-template-columns: 1fr;

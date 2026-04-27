@@ -14,7 +14,12 @@ export function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (isAuthenticated && user) {
-    return <Navigate to={ROLE_HOME[user.role] ?? ROLE_HOME[ROLES.USER]} replace />;
+    return (
+      <Navigate
+        to={user.role === ROLES.USER ? '/app/connect' : ROLE_HOME[user.role] ?? ROLE_HOME[ROLES.USER]}
+        replace
+      />
+    );
   }
 
   const redirectTo = location.state?.from?.pathname;
@@ -26,9 +31,12 @@ export function LoginPage() {
 
     try {
       const nextUser = await login(form);
-      navigate(redirectTo ?? ROLE_HOME[nextUser.role] ?? ROLE_HOME[ROLES.USER], {
-        replace: true,
-      });
+      const nextRoute =
+        nextUser.role === ROLES.USER
+          ? '/app/connect'
+          : redirectTo ?? ROLE_HOME[nextUser.role] ?? ROLE_HOME[ROLES.USER];
+
+      navigate(nextRoute, { replace: true });
     } catch (loginError) {
       setError(loginError.message);
     } finally {

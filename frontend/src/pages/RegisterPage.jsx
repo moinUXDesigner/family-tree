@@ -13,7 +13,12 @@ export function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (isAuthenticated && user) {
-    return <Navigate to={ROLE_HOME[user.role] ?? ROLE_HOME[ROLES.USER]} replace />;
+    return (
+      <Navigate
+        to={user.role === ROLES.USER ? '/app/connect' : ROLE_HOME[user.role] ?? ROLE_HOME[ROLES.USER]}
+        replace
+      />
+    );
   }
 
   async function handleSubmit(event) {
@@ -23,7 +28,12 @@ export function RegisterPage() {
 
     try {
       const nextUser = await register(form);
-      navigate(ROLE_HOME[nextUser.role] ?? ROLE_HOME[ROLES.USER], { replace: true });
+      const nextRoute =
+        nextUser.role === ROLES.USER
+          ? '/app/connect'
+          : ROLE_HOME[nextUser.role] ?? ROLE_HOME[ROLES.USER];
+
+      navigate(nextRoute, { replace: true });
     } catch (registerError) {
       setError(registerError.message);
     } finally {

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\FamilyConnectionController;
 use App\Http\Controllers\Api\FamilyController;
 use App\Http\Controllers\Api\FamilyMemberController;
 use App\Http\Controllers\Api\FamilyRelationshipController;
@@ -29,6 +30,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/family-members', [FamilyMemberController::class, 'store']);
             Route::get('/family-relationships', [FamilyRelationshipController::class, 'index']);
             Route::get('/family-tree', [FamilyTreeController::class, 'show']);
+            Route::get('/family-connection', [FamilyConnectionController::class, 'status']);
+            Route::post('/family-connection', [FamilyConnectionController::class, 'connect']);
         });
 
         Route::middleware('role:admin,super_admin')->group(function (): void {

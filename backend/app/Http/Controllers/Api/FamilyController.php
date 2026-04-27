@@ -15,9 +15,12 @@ class FamilyController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
+        $familyId = $user->hasRole(User::ROLE_SUPER_ADMIN)
+            ? null
+            : $this->familyIdForUser($user);
 
         $families = Family::query()
-            ->when(! $user->hasRole(User::ROLE_SUPER_ADMIN), fn ($query) => $query->whereKey($user->family_id))
+            ->when(! $user->hasRole(User::ROLE_SUPER_ADMIN), fn ($query) => $query->whereKey($familyId))
             ->withCount('members')
             ->orderBy('name')
             ->get()
@@ -85,5 +88,24 @@ class FamilyController extends Controller
         }
 
         return $slug;
+    }
+
+    private function familyIdForUser(User $user): int
+    {
+        if ($user->family_id) {
+            return $user->family_id;
+        }
+
+        $family = Family::query()->create([
+            'name' => "{$user->name}'s Family",
+            'slug' => $this->uniqueSlug($user->name),
+            'description' => null,
+            'is_active' => true,
+            'created_by' => $user->id,
+        ]);
+
+        $user->forceFill(['family_id' => $family->id])->save();
+
+        return $family->id;
     }
 }
