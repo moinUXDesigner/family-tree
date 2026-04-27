@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\FamilyController;
 use App\Http\Controllers\Api\FamilyMemberController;
 use App\Http\Controllers\Api\FamilyRelationshipController;
 use App\Http\Controllers\Api\FamilyTreeController;
+use App\Http\Controllers\Api\RootFamilyController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -41,7 +42,11 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/family-relationships/{familyRelationship}', [FamilyRelationshipController::class, 'destroy']);
         });
 
-        Route::middleware('role:super_admin')->post('/families', [FamilyController::class, 'store']);
+        Route::middleware('role:super_admin')->group(function (): void {
+            Route::post('/families', [FamilyController::class, 'store']);
+            Route::get('/root-family', [RootFamilyController::class, 'show']);
+            Route::post('/root-family/members', [RootFamilyController::class, 'storeMember']);
+        });
 
         Route::middleware('role:super_admin')->get('/super-admin/ping', fn () => response()->json([
             'status' => true,

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   AccountTree,
   Dashboard,
+  FamilyRestroom,
   Group,
   Menu,
   PeopleAlt,
@@ -58,6 +59,15 @@ const navItems = [
       [ROLES.USER]: '/app/tree',
     },
   },
+  {
+    key: 'root-family',
+    label: 'Nanne Tree',
+    icon: <FamilyRestroom />,
+    roles: [ROLES.SUPER_ADMIN],
+    route: {
+      [ROLES.SUPER_ADMIN]: '/super-admin/root-family',
+    },
+  },
 ];
 
 export function NavigationChrome({ active, role }) {
@@ -89,7 +99,7 @@ export function NavigationChrome({ active, role }) {
         </div>
 
         <nav aria-label="Dashboard navigation">
-          {navItems.map((item) => (
+          {navItems.filter((item) => !item.roles || item.roles.includes(role)).map((item) => (
             <Tooltip disableHoverListener={!isCollapsed} key={item.key} placement="right" title={item.label}>
               <Link
                 className={active === item.key ? 'nav-item active' : 'nav-item'}
@@ -105,7 +115,7 @@ export function NavigationChrome({ active, role }) {
 
       <Paper className="bottom-nav-shell" elevation={8}>
         <BottomNavigation showLabels value={active}>
-          {navItems.map((item) => (
+          {navItems.filter((item) => !item.roles || item.roles.includes(role)).map((item) => (
             <BottomNavigationAction
               component={Link}
               icon={item.icon}
