@@ -171,6 +171,11 @@ export function FamiliesPage() {
                   <div className="member-title-line">
                     <strong>{request.name}</strong>
                     <Badge variant="neutral">{request.family_name ?? 'No family linked'}</Badge>
+                    <Badge variant="primary">
+                      {request.relationship_label
+                        ? `Relation: ${request.relationship_label}`
+                        : 'Relation not selected'}
+                    </Badge>
                   </div>
                   <p>{request.email}</p>
                   <small>Status: {request.approval_status}</small>
