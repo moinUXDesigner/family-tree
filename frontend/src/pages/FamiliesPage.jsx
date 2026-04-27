@@ -178,6 +178,7 @@ export function FamiliesPage() {
                     </Badge>
                   </div>
                   <p>{request.email}</p>
+                  {request.phone ? <p>{request.phone}</p> : null}
                   <small>Status: {request.approval_status}</small>
                 </div>
                 <div className="member-meta">

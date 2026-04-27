@@ -17,6 +17,7 @@ class AuthController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'phone' => ['required', 'string', 'max:50'],
             'password' => ['required', 'string', 'min:8'],
             'role' => ['sometimes', Rule::in([User::ROLE_USER])],
         ]);
@@ -24,6 +25,7 @@ class AuthController extends Controller
         $user = User::query()->create([
             'name' => $data['name'],
             'email' => $data['email'],
+            'phone' => $data['phone'],
             'password' => $data['password'],
             'role' => User::ROLE_USER,
             'approval_status' => User::APPROVAL_PENDING,
@@ -104,6 +106,7 @@ class AuthController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'phone' => $user->phone,
             'role' => $user->role,
             'family_id' => $user->family_id,
             'approval_status' => $user->approval_status,

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { Mail, ShieldCheck, User, UserPlus } from 'lucide-react';
+import { Mail, Phone, ShieldCheck, User, UserPlus } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLE_HOME, ROLES } from '../config/roles.js';
 import { Alert, Button, Card, Input } from '../app/components';
@@ -8,7 +8,7 @@ import { Alert, Button, Card, Input } from '../app/components';
 export function RegisterPage() {
   const { isAuthenticated, register, user } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -71,6 +71,17 @@ export function RegisterPage() {
             type="email"
             value={form.email}
             onChange={(event) => setForm({ ...form, email: event.target.value })}
+            required
+            fullWidth
+          />
+
+          <Input
+            autoComplete="tel"
+            label="Phone number"
+            leftIcon={<Phone aria-hidden="true" size={18} />}
+            type="tel"
+            value={form.phone}
+            onChange={(event) => setForm({ ...form, phone: event.target.value })}
             required
             fullWidth
           />

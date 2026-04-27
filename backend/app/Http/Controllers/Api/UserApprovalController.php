@@ -70,6 +70,7 @@ class UserApprovalController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'phone' => $user->phone,
             'family_id' => $user->family_id,
             'family_name' => $user->family?->name,
             'member_id' => $member?->id,
