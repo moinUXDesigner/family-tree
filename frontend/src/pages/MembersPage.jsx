@@ -42,6 +42,8 @@ const emptyForm = {
   last_name: '',
   gender: '',
   birth_date: '',
+  death_date: '',
+  graveyard_location: '',
   email: '',
   phone: '',
   current_city: '',
@@ -151,6 +153,8 @@ export function MembersPage({ role }) {
         family_id: Number(selectedFamilyId),
         family_head_id: form.family_head_id ? Number(form.family_head_id) : null,
         is_living: form.living_status === 'living',
+        death_date: form.living_status === 'deceased' ? form.death_date : null,
+        graveyard_location: form.living_status === 'deceased' ? form.graveyard_location : null,
         is_private: false,
       };
 
@@ -244,6 +248,8 @@ export function MembersPage({ role }) {
       last_name: member.last_name ?? '',
       gender: member.gender ?? '',
       birth_date: member.birth_date ?? '',
+      death_date: member.death_date ?? '',
+      graveyard_location: member.graveyard_location ?? '',
       email: member.email ?? '',
       phone: member.phone ?? '',
       current_city: member.current_city ?? '',
@@ -446,13 +452,45 @@ export function MembersPage({ role }) {
                 Living Status
                 <select
                   value={form.living_status}
-                  onChange={(event) => updateForm('living_status', event.target.value)}
+                  onChange={(event) => {
+                    if (event.target.value === 'living') {
+                      setForm((current) => ({
+                        ...current,
+                        living_status: 'living',
+                        death_date: '',
+                        graveyard_location: '',
+                      }));
+                      return;
+                    }
+
+                    updateForm('living_status', event.target.value);
+                  }}
                   required
                 >
                   <option value="living">Living</option>
                   <option value="deceased">Deceased</option>
                 </select>
               </label>
+
+              {form.living_status === 'deceased' ? (
+                <>
+                  <Input
+                    label="Date of Expiry"
+                    leftIcon={<CalendarDays aria-hidden="true" size={18} />}
+                    type="date"
+                    value={form.death_date}
+                    onChange={(event) => updateForm('death_date', event.target.value)}
+                    fullWidth
+                  />
+                  <Input
+                    label="Graveyard Location"
+                    leftIcon={<MapPin aria-hidden="true" size={18} />}
+                    value={form.graveyard_location}
+                    onChange={(event) => updateForm('graveyard_location', event.target.value)}
+                    fullWidth
+                  />
+                </>
+              ) : null}
 
               <Button
                 className="member-form-action"
