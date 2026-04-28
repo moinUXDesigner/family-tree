@@ -76,17 +76,26 @@ class FamilyMemberController extends Controller
 
         $data = $this->validatedMemberData($request, $familyMember);
         $family = $this->accessibleFamily($request, (int) $data['family_id'], true);
+        $previousMaritalStatus = $familyMember->marital_status;
 
         $familyMember->update([
             ...$this->memberFields($data),
             'family_id' => $family->id,
         ]);
 
+        $newFamily = $this->createMarriedFamilyForUpdate(
+            $request,
+            $familyMember->refresh(),
+            $previousMaritalStatus,
+            $data['marital_status'] ?? null
+        );
+
         return response()->json([
             'status' => true,
             'message' => 'Family member updated.',
             'data' => [
-                'member' => $this->memberPayload($familyMember->refresh()->load('family:id,name')),
+                'member' => $this->memberPayload($familyMember->load('family:id,name')),
+                'family' => $newFamily ? $this->familyPayload($newFamily) : null,
             ],
         ]);
     }
@@ -334,6 +343,19 @@ class FamilyMemberController extends Controller
             'is_active' => true,
             'created_by' => $request->user()->id,
         ]);
+    }
+
+    private function createMarriedFamilyForUpdate(
+        Request $request,
+        FamilyMember $member,
+        ?string $previousMaritalStatus,
+        ?string $maritalStatus,
+    ): ?Family {
+        if ($previousMaritalStatus === 'married') {
+            return null;
+        }
+
+        return $this->createMarriedFamily($request, $member, $maritalStatus);
     }
 
     private function uniqueFamilySlug(string $name): string
