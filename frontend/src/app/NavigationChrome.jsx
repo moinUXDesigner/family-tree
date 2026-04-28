@@ -9,6 +9,7 @@ import {
   Menu,
   PeopleAlt,
   RecentActors,
+  VerifiedUser,
 } from '@mui/icons-material';
 import {
   BottomNavigation,
@@ -68,6 +69,15 @@ const navItems = [
     roles: [ROLES.SUPER_ADMIN],
     route: {
       [ROLES.SUPER_ADMIN]: '/super-admin/families',
+    },
+  },
+  {
+    key: 'approvals',
+    label: 'Approvals',
+    icon: <VerifiedUser />,
+    roles: [ROLES.SUPER_ADMIN],
+    route: {
+      [ROLES.SUPER_ADMIN]: '/super-admin/approvals',
     },
   },
   {

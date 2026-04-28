@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { RegisterPage } from './pages/RegisterPage.jsx';
+import { ApprovalsPage } from './pages/ApprovalsPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { FamiliesPage } from './pages/FamiliesPage.jsx';
 import { FamilyConnectionPage } from './pages/FamilyConnectionPage.jsx';
@@ -48,6 +49,7 @@ export function App() {
             element={<MembersPage role={ROLES.SUPER_ADMIN} />}
           />
           <Route path="/super-admin/families" element={<FamiliesPage />} />
+          <Route path="/super-admin/approvals" element={<ApprovalsPage />} />
           <Route path="/super-admin/users" element={<UsersPage />} />
           <Route
             path="/super-admin/relationships"

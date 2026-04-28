@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { LogOut, Plus, ShieldCheck, Trash2, UsersRound } from 'lucide-react';
+import { LogOut, Plus, Trash2, UsersRound } from 'lucide-react';
 import { NavigationChrome } from '../app/NavigationChrome.jsx';
 import { Alert, Badge, Button, Card, Input } from '../app/components';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLES } from '../config/roles.js';
-import { approvalApi } from '../services/approvalApi.js';
 import { familyApi } from '../services/familyApi.js';
 
 const emptyFamilyForm = {
@@ -15,7 +14,6 @@ const emptyFamilyForm = {
 export function FamiliesPage() {
   const { logout, token } = useAuth();
   const [families, setFamilies] = useState([]);
-  const [requests, setRequests] = useState([]);
   const [form, setForm] = useState(emptyFamilyForm);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -36,17 +34,13 @@ export function FamiliesPage() {
       setError('');
 
       try {
-        const [nextFamilies, nextRequests] = await Promise.all([
-          familyApi.listFamilies(token),
-          approvalApi.listRequests(token),
-        ]);
+        const nextFamilies = await familyApi.listFamilies(token);
 
         if (!isMounted) {
           return;
         }
 
         setFamilies(nextFamilies);
-        setRequests(nextRequests);
       } catch (loadError) {
         if (isMounted) {
           setError(loadError.message);
@@ -102,23 +96,6 @@ export function FamiliesPage() {
     }
   }
 
-  async function updateApproval(request, approvalStatus) {
-    setError('');
-    setSuccess('');
-
-    try {
-      await approvalApi.updateRequest(token, request.id, approvalStatus);
-      setRequests((current) => current.filter((item) => item.id !== request.id));
-      setSuccess(
-        approvalStatus === 'approved'
-          ? `${request.name} approved for family access.`
-          : `${request.name} request rejected.`,
-      );
-    } catch (approvalError) {
-      setError(approvalError.message);
-    }
-  }
-
   function showCreateFamilyForm() {
     setError('');
     setSuccess('');
@@ -141,7 +118,7 @@ export function FamiliesPage() {
           <div>
             <Badge variant="primary">Super Admin</Badge>
             <h1>Families</h1>
-            <p>Review all families, create new family spaces, and approve member access requests.</p>
+            <p>Review all families and create new family spaces for members.</p>
           </div>
           <Button onClick={logout} type="button" variant="outline">
             <LogOut aria-hidden="true" />
@@ -161,65 +138,7 @@ export function FamiliesPage() {
             <span>Members</span>
             <strong>{totalMembers}</strong>
           </Card>
-          <Card className="metric-card" padding="md" variant="elevated">
-            <span>Pending approvals</span>
-            <strong>{requests.length}</strong>
-          </Card>
         </section>
-
-        <Card padding="lg" variant="bordered">
-          <div className="section-heading">
-            <div>
-              <h2>Pending access requests</h2>
-              <p>{isLoading ? 'Loading requests...' : `${requests.length} users waiting for approval.`}</p>
-            </div>
-            <ShieldCheck aria-hidden="true" />
-          </div>
-
-          <div className="member-list">
-            {requests.map((request) => (
-              <article className="member-row" key={request.id}>
-                <div className="member-avatar" aria-hidden="true">
-                  {initials(request.name)}
-                </div>
-                <div className="member-main">
-                  <div className="member-title-line">
-                    <strong>{request.name}</strong>
-                    <Badge variant="neutral">{request.family_name ?? 'No family linked'}</Badge>
-                    <Badge variant="primary">
-                      {request.relationship_label
-                        ? `Relation: ${request.relationship_label}`
-                        : 'Relation not selected'}
-                    </Badge>
-                  </div>
-                  <p>{request.email}</p>
-                  {request.phone ? <p>{request.phone}</p> : null}
-                  <small>Status: {request.approval_status}</small>
-                </div>
-                <div className="member-meta">
-                  <Button onClick={() => updateApproval(request, 'approved')} type="button">
-                    Approve
-                  </Button>
-                  <button
-                    className="text-action danger"
-                    onClick={() => updateApproval(request, 'rejected')}
-                    type="button"
-                  >
-                    Reject
-                  </button>
-                </div>
-              </article>
-            ))}
-
-            {!isLoading && requests.length === 0 ? (
-              <div className="empty-state compact">
-                <ShieldCheck aria-hidden="true" />
-                <strong>No pending approvals</strong>
-                <p>New member signups will appear here after they connect to the root.</p>
-              </div>
-            ) : null}
-          </div>
-        </Card>
 
         {isCreatingFamily ? (
           <Card padding="lg" variant="elevated">
