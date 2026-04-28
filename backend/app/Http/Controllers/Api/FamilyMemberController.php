@@ -311,10 +311,11 @@ class FamilyMemberController extends Controller
     private function memberCreationFailure(Request $request, \Throwable $exception): JsonResponse
     {
         $reference = 'member-create-'.Str::lower(Str::random(8));
+        $user = $request->user();
 
         Log::error('Family member creation failed.', [
             'reference' => $reference,
-            'user_id' => $request->user()?->id,
+            'user_id' => $user?->id,
             'family_id' => $request->input('family_id'),
             'family_head_id' => $request->input('family_head_id'),
             'relationship' => $request->input('relation_to_family_head') ?? $request->input('relationship_to_family_head'),
@@ -322,9 +323,15 @@ class FamilyMemberController extends Controller
             'exception' => $exception,
         ]);
 
+        $message = "Unable to add family member. Reference: {$reference}";
+
+        if ($user?->hasRole(User::ROLE_SUPER_ADMIN)) {
+            $message .= " Detail: {$exception->getMessage()}";
+        }
+
         return response()->json([
             'status' => false,
-            'message' => "Unable to add family member. Reference: {$reference}",
+            'message' => $message,
             'data' => null,
         ], Response::HTTP_INTERNAL_SERVER_ERROR);
     }
