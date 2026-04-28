@@ -23,6 +23,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'phone',
     'current_city',
     'current_country',
+    'family_head_id',
+    'relation_to_family_head',
+    'marital_status',
+    'graveyard_location',
     'notes',
     'is_living',
     'is_private',
@@ -81,6 +85,7 @@ class FamilyMember extends Model
         return [
             'birth_date' => 'date:Y-m-d',
             'death_date' => 'date:Y-m-d',
+            'family_head_id' => 'integer',
             'is_living' => 'boolean',
             'is_private' => 'boolean',
         ];

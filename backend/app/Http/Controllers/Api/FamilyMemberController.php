@@ -135,6 +135,8 @@ class FamilyMemberController extends Controller
      */
     private function validatedMemberData(Request $request, ?FamilyMember $member = null): array
     {
+        $this->normalizeMemberRequest($request);
+
         return $request->validate([
             'family_id' => ['required', 'integer', Rule::exists('families', 'id')],
             'user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
@@ -149,6 +151,16 @@ class FamilyMemberController extends Controller
             'phone' => ['nullable', 'string', 'max:50'],
             'current_city' => ['nullable', 'string', 'max:255'],
             'current_country' => ['nullable', 'string', 'max:255'],
+            'family_head_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('family_members', 'id')->where(
+                    fn (Builder $query) => $query->where('family_id', $request->integer('family_id'))
+                ),
+            ],
+            'relation_to_family_head' => ['nullable', 'string', 'max:100'],
+            'marital_status' => ['nullable', 'string', 'max:50'],
+            'graveyard_location' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'is_living' => ['sometimes', 'boolean'],
             'is_private' => ['sometimes', 'boolean'],
@@ -156,6 +168,76 @@ class FamilyMemberController extends Controller
             'relationship_to_family_head' => ['sometimes', 'nullable', 'string', Rule::in($this->relationshipOptions())],
             'marital_status' => ['sometimes', 'nullable', 'string', Rule::in(['married', 'unmarried'])],
         ]);
+    }
+
+    private function normalizeMemberRequest(Request $request): void
+    {
+        $aliases = [
+            'date_of_expiry' => 'death_date',
+            'expiry_date' => 'death_date',
+            'family_head' => 'family_head_id',
+            'selected_family_head' => 'family_head_id',
+            'relation' => 'relation_to_family_head',
+            'relationship_to_family_head' => 'relation_to_family_head',
+            'married_status' => 'marital_status',
+            'married_unmarried' => 'marital_status',
+            'cemetery_location' => 'graveyard_location',
+        ];
+
+        $normalized = [];
+
+        foreach ($aliases as $from => $to) {
+            if ($request->has($from) && ! $request->has($to)) {
+                $normalized[$to] = $this->blankToNull($request->input($from));
+            }
+        }
+
+        if ($request->has('living_status') && ! $request->has('is_living')) {
+            $normalized['is_living'] = $this->livingStatusToBoolean($request->input('living_status'));
+        }
+
+        if ($request->has('is_deceased') && ! $request->has('is_living')) {
+            $normalized['is_living'] = ! $request->boolean('is_deceased');
+        }
+
+        $dateFields = ['birth_date', 'death_date'];
+        foreach ($dateFields as $field) {
+            $value = $this->blankToNull($normalized[$field] ?? $request->input($field));
+
+            if (is_string($value) && preg_match('/^\d{2}-\d{2}-\d{4}$/', $value)) {
+                [$day, $month, $year] = explode('-', $value);
+                $normalized[$field] = "{$year}-{$month}-{$day}";
+            } elseif ($value === null && $request->has($field)) {
+                $normalized[$field] = null;
+            }
+        }
+
+        if (
+            ($request->has('family_head_id') || array_key_exists('family_head_id', $normalized))
+            && (int) ($normalized['family_head_id'] ?? $request->input('family_head_id')) === 0
+        ) {
+            $normalized['family_head_id'] = null;
+        }
+
+        if ($normalized !== []) {
+            $request->merge($normalized);
+        }
+    }
+
+    private function blankToNull(mixed $value): mixed
+    {
+        return $value === '' ? null : $value;
+    }
+
+    private function livingStatusToBoolean(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        $status = strtolower((string) $value);
+
+        return ! in_array($status, ['deceased', 'dead', 'expired', 'false', '0'], true);
     }
 
     /**
@@ -350,6 +432,10 @@ class FamilyMemberController extends Controller
             'phone' => $member->phone,
             'current_city' => $member->current_city,
             'current_country' => $member->current_country,
+            'family_head_id' => $member->family_head_id,
+            'relation_to_family_head' => $member->relation_to_family_head,
+            'marital_status' => $member->marital_status,
+            'graveyard_location' => $member->graveyard_location,
             'notes' => $member->notes,
             'is_living' => $member->is_living,
             'is_private' => $member->is_private,
