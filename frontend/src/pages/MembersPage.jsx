@@ -254,6 +254,9 @@ export function MembersPage({ role }) {
       phone: member.phone ?? '',
       current_city: member.current_city ?? '',
       current_country: member.current_country ?? '',
+      family_head_id: member.family_head_id ? String(member.family_head_id) : '',
+      relationship_to_family_head: member.relation_to_family_head ?? '',
+      marital_status: member.marital_status ?? 'unmarried',
       living_status: member.is_living ? 'living' : 'deceased',
     });
   }

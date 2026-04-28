@@ -51,8 +51,14 @@ class FamilyMemberController extends Controller
             'created_by' => $request->user()->id,
         ]);
 
-        $this->connectToFamilyHead($family, $familyHead, $member, $data['relationship_to_family_head'], $request->user());
-        $newFamily = $this->createMarriedFamily($request, $member, $data['marital_status']);
+        $this->connectToFamilyHead(
+            $family,
+            $familyHead,
+            $member,
+            $data['relationship_to_family_head'] ?? $data['relation_to_family_head'] ?? null,
+            $request->user()
+        );
+        $newFamily = $this->createMarriedFamily($request, $member, $data['marital_status'] ?? null);
 
         return response()->json([
             'status' => true,
@@ -145,7 +151,6 @@ class FamilyMemberController extends Controller
             'gender' => ['nullable', 'string', 'max:32'],
             'birth_date' => ['nullable', 'date'],
             'death_date' => ['nullable', 'date', 'after_or_equal:birth_date'],
-            'graveyard_location' => ['nullable', 'string', 'max:255'],
             'photo_path' => ['nullable', 'string', 'max:2048'],
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
@@ -158,15 +163,13 @@ class FamilyMemberController extends Controller
                     fn (Builder $query) => $query->where('family_id', $request->integer('family_id'))
                 ),
             ],
-            'relation_to_family_head' => ['nullable', 'string', 'max:100'],
-            'marital_status' => ['nullable', 'string', 'max:50'],
+            'relation_to_family_head' => ['sometimes', 'nullable', 'string', Rule::in($this->relationshipOptions())],
+            'relationship_to_family_head' => ['sometimes', 'nullable', 'string', Rule::in($this->relationshipOptions())],
+            'marital_status' => ['sometimes', 'nullable', 'string', Rule::in(['married', 'unmarried'])],
             'graveyard_location' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'is_living' => ['sometimes', 'boolean'],
             'is_private' => ['sometimes', 'boolean'],
-            'family_head_id' => ['sometimes', 'nullable', 'integer', Rule::exists('family_members', 'id')],
-            'relationship_to_family_head' => ['sometimes', 'nullable', 'string', Rule::in($this->relationshipOptions())],
-            'marital_status' => ['sometimes', 'nullable', 'string', Rule::in(['married', 'unmarried'])],
         ]);
     }
 
@@ -260,6 +263,9 @@ class FamilyMemberController extends Controller
             'phone',
             'current_city',
             'current_country',
+            'family_head_id',
+            'relation_to_family_head',
+            'marital_status',
             'notes',
             'is_living',
             'is_private',
@@ -425,7 +431,6 @@ class FamilyMemberController extends Controller
             'gender' => $member->gender,
             'birth_date' => $member->birth_date?->format('Y-m-d'),
             'death_date' => $member->death_date?->format('Y-m-d'),
-            'graveyard_location' => $member->graveyard_location,
             'photo_path' => $member->photo_path,
             'photo_url' => $member->photo_path ? Storage::disk('user_photos')->url($member->photo_path) : null,
             'email' => $member->email,
