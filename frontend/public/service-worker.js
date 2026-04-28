@@ -21,8 +21,13 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  const requestUrl = new URL(request.url);
 
   if (request.method !== 'GET') {
+    return;
+  }
+
+  if (!['http:', 'https:'].includes(requestUrl.protocol)) {
     return;
   }
 
@@ -38,9 +43,9 @@ self.addEventListener('fetch', (event) => {
       }
 
       return fetch(request).then((networkResponse) => {
-        if (networkResponse.ok) {
+        if (networkResponse.ok && requestUrl.origin === self.location.origin) {
           const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone)).catch(() => null);
         }
 
         return networkResponse;
