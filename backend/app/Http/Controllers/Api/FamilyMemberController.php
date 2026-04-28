@@ -43,11 +43,11 @@ class FamilyMemberController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $data = $this->validatedMemberData($request);
-        $family = $this->accessibleFamily($request, (int) $data['family_id'], false);
-        $familyHead = $this->familyHead($family, $data);
-
         try {
+            $data = $this->validatedMemberData($request);
+            $family = $this->accessibleFamily($request, (int) $data['family_id'], false);
+            $familyHead = $this->familyHead($family, $data);
+
             [$member, $newFamily] = DB::transaction(function () use ($request, $data, $family, $familyHead): array {
                 $member = FamilyMember::query()->create([
                     ...$this->memberFields($data),
@@ -67,34 +67,20 @@ class FamilyMemberController extends Controller
 
                 return [$member, $newFamily];
             });
-        } catch (\Throwable $exception) {
-            $reference = 'member-create-'.Str::lower(Str::random(8));
-
-            Log::error('Family member creation failed.', [
-                'reference' => $reference,
-                'user_id' => $request->user()?->id,
-                'family_id' => $data['family_id'] ?? null,
-                'family_head_id' => $data['family_head_id'] ?? null,
-                'relationship' => $data['relation_to_family_head'] ?? null,
-                'marital_status' => $data['marital_status'] ?? null,
-                'exception' => $exception,
-            ]);
 
             return response()->json([
-                'status' => false,
-                'message' => "Unable to add family member. Reference: {$reference}",
-                'data' => null,
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                'status' => true,
+                'message' => 'Family member created.',
+                'data' => [
+                    'member' => $this->memberPayload($member->load('family:id,name')),
+                    'family' => $newFamily ? $this->familyPayload($newFamily) : null,
+                ],
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            return $this->memberCreationFailure($request, $exception);
         }
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Family member created.',
-            'data' => [
-                'member' => $this->memberPayload($member->load('family:id,name')),
-                'family' => $newFamily ? $this->familyPayload($newFamily) : null,
-            ],
-        ], 201);
     }
 
     public function update(Request $request, FamilyMember $familyMember): JsonResponse
@@ -320,6 +306,27 @@ class FamilyMemberController extends Controller
         return FamilyMember::query()
             ->where('family_id', $family->id)
             ->findOrFail((int) $data['family_head_id']);
+    }
+
+    private function memberCreationFailure(Request $request, \Throwable $exception): JsonResponse
+    {
+        $reference = 'member-create-'.Str::lower(Str::random(8));
+
+        Log::error('Family member creation failed.', [
+            'reference' => $reference,
+            'user_id' => $request->user()?->id,
+            'family_id' => $request->input('family_id'),
+            'family_head_id' => $request->input('family_head_id'),
+            'relationship' => $request->input('relation_to_family_head') ?? $request->input('relationship_to_family_head'),
+            'marital_status' => $request->input('marital_status'),
+            'exception' => $exception,
+        ]);
+
+        return response()->json([
+            'status' => false,
+            'message' => "Unable to add family member. Reference: {$reference}",
+            'data' => null,
+        ], Response::HTTP_INTERNAL_SERVER_ERROR);
     }
 
     private function connectToFamilyHead(
