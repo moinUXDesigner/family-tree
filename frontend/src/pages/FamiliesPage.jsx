@@ -21,6 +21,7 @@ export function FamiliesPage() {
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingFamily, setIsCreatingFamily] = useState(false);
 
   const totalMembers = useMemo(
     () => families.reduce((total, family) => total + Number(family.members_count ?? 0), 0),
@@ -79,6 +80,7 @@ export function FamiliesPage() {
 
       setFamilies((current) => [...current, family].sort(sortFamilies));
       setForm(emptyFamilyForm);
+      setIsCreatingFamily(false);
       setSuccess('Family created.');
     } catch (createError) {
       setError(createError.message);
@@ -115,6 +117,19 @@ export function FamiliesPage() {
     } catch (approvalError) {
       setError(approvalError.message);
     }
+  }
+
+  function showCreateFamilyForm() {
+    setError('');
+    setSuccess('');
+    setForm(emptyFamilyForm);
+    setIsCreatingFamily(true);
+  }
+
+  function hideCreateFamilyForm() {
+    setError('');
+    setForm(emptyFamilyForm);
+    setIsCreatingFamily(false);
   }
 
   return (
@@ -206,81 +221,97 @@ export function FamiliesPage() {
           </div>
         </Card>
 
-        <Card padding="lg" variant="elevated">
-          <div className="section-heading">
-            <div>
-              <h2>Create family</h2>
-              <p>Add another family group that Super Admins can manage.</p>
+        {isCreatingFamily ? (
+          <Card padding="lg" variant="elevated">
+            <div className="section-heading">
+              <div>
+                <h2>Create family</h2>
+                <p>Add another family group that Super Admins can manage.</p>
+              </div>
+              <Button onClick={hideCreateFamilyForm} type="button" variant="outline">
+                Cancel
+              </Button>
             </div>
-          </div>
 
-          <form className="member-form" onSubmit={handleCreateFamily}>
-            <Input
-              label="Family name"
-              value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              required
-              fullWidth
-            />
-            <label className="field-group member-form-wide">
-              Description
-              <textarea
-                value={form.description}
-                onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-                rows={3}
+            <form className="member-form" onSubmit={handleCreateFamily}>
+              <Input
+                label="Family name"
+                value={form.name}
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                required
+                fullWidth
               />
-            </label>
-            <Button
-              className="member-form-action"
-              disabled={isSubmitting || !form.name.trim()}
-              isLoading={isSubmitting}
-              type="submit"
-            >
-              <Plus aria-hidden="true" />
-              Add family
-            </Button>
-          </form>
-        </Card>
-
-        <Card padding="lg" variant="elevated">
-          <div className="section-heading">
-            <div>
-              <h2>All families</h2>
-              <p>{isLoading ? 'Loading families...' : `${families.length} families available.`}</p>
+              <label className="field-group member-form-wide">
+                Description
+                <textarea
+                  value={form.description}
+                  onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                  rows={3}
+                />
+              </label>
+              <Button
+                className="member-form-action"
+                disabled={isSubmitting || !form.name.trim()}
+                isLoading={isSubmitting}
+                type="submit"
+              >
+                <Plus aria-hidden="true" />
+                Add family
+              </Button>
+            </form>
+          </Card>
+        ) : (
+          <Card padding="lg" variant="elevated">
+            <div className="section-heading">
+              <div>
+                <h2>All families</h2>
+                <p>{isLoading ? 'Loading families...' : `${families.length} families available.`}</p>
+              </div>
+              <Button onClick={showCreateFamilyForm} type="button">
+                <Plus aria-hidden="true" />
+                Create family
+              </Button>
             </div>
-            <UsersRound aria-hidden="true" />
-          </div>
 
-          <div className="member-list">
-            {families.map((family) => (
-              <article className="member-row" key={family.id}>
-                <div className="member-avatar" aria-hidden="true">
-                  {initials(family.name)}
-                </div>
-                <div className="member-main">
-                  <div className="member-title-line">
-                    <strong>{family.name}</strong>
-                    <Badge variant={family.is_active ? 'success' : 'neutral'}>
-                      {family.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
+            <div className="member-list">
+              {families.map((family) => (
+                <article className="member-row" key={family.id}>
+                  <div className="member-avatar" aria-hidden="true">
+                    {initials(family.name)}
                   </div>
-                  <p>{family.description || 'No description added'}</p>
-                  <small>Family ID: {family.id} | Members: {family.members_count ?? 0}</small>
+                  <div className="member-main">
+                    <div className="member-title-line">
+                      <strong>{family.name}</strong>
+                      <Badge variant={family.is_active ? 'success' : 'neutral'}>
+                        {family.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </div>
+                    <p>{family.description || 'No description added'}</p>
+                    <small>Family ID: {family.id} | Members: {family.members_count ?? 0}</small>
+                  </div>
+                  <div className="member-meta">
+                    <button
+                      className="text-action danger"
+                      onClick={() => handleDeleteFamily(family)}
+                      type="button"
+                    >
+                      <Trash2 aria-hidden="true" size={16} />
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))}
+
+              {!isLoading && families.length === 0 ? (
+                <div className="empty-state compact">
+                  <UsersRound aria-hidden="true" />
+                  <strong>No families yet</strong>
+                  <p>Create the first family group to start organizing members.</p>
                 </div>
-                <div className="member-meta">
-                  <button
-                    className="text-action danger"
-                    onClick={() => handleDeleteFamily(family)}
-                    type="button"
-                  >
-                    <Trash2 aria-hidden="true" size={16} />
-                    Delete
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </Card>
+              ) : null}
+            </div>
+          </Card>
+        )}
       </section>
     </main>
   );
