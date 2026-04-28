@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -46,25 +47,45 @@ class FamilyMemberController extends Controller
         $family = $this->accessibleFamily($request, (int) $data['family_id'], false);
         $familyHead = $this->familyHead($family, $data);
 
-        [$member, $newFamily] = DB::transaction(function () use ($request, $data, $family, $familyHead): array {
-            $member = FamilyMember::query()->create([
-                ...$this->memberFields($data),
-                'family_id' => $family->id,
-                'created_by' => $request->user()->id,
+        try {
+            [$member, $newFamily] = DB::transaction(function () use ($request, $data, $family, $familyHead): array {
+                $member = FamilyMember::query()->create([
+                    ...$this->memberFields($data),
+                    'family_id' => $family->id,
+                    'created_by' => $request->user()->id,
+                ]);
+
+                $this->connectToFamilyHead(
+                    $family,
+                    $familyHead,
+                    $member,
+                    $data['relationship_to_family_head'] ?? $data['relation_to_family_head'] ?? null,
+                    $request->user()
+                );
+
+                $newFamily = $this->createMarriedFamily($request, $member, $data['marital_status'] ?? null);
+
+                return [$member, $newFamily];
+            });
+        } catch (\Throwable $exception) {
+            $reference = 'member-create-'.Str::lower(Str::random(8));
+
+            Log::error('Family member creation failed.', [
+                'reference' => $reference,
+                'user_id' => $request->user()?->id,
+                'family_id' => $data['family_id'] ?? null,
+                'family_head_id' => $data['family_head_id'] ?? null,
+                'relationship' => $data['relation_to_family_head'] ?? null,
+                'marital_status' => $data['marital_status'] ?? null,
+                'exception' => $exception,
             ]);
 
-            $this->connectToFamilyHead(
-                $family,
-                $familyHead,
-                $member,
-                $data['relationship_to_family_head'] ?? $data['relation_to_family_head'] ?? null,
-                $request->user()
-            );
-
-            $newFamily = $this->createMarriedFamily($request, $member, $data['marital_status'] ?? null);
-
-            return [$member, $newFamily];
-        });
+            return response()->json([
+                'status' => false,
+                'message' => "Unable to add family member. Reference: {$reference}",
+                'data' => null,
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
 
         return response()->json([
             'status' => true,
