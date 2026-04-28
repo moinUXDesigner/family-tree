@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Family;
 use App\Models\FamilyMember;
+use App\Models\FamilyRelationship;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -12,6 +13,70 @@ use Tests\TestCase;
 class FamilyMemberUpdateTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_admin_can_create_member_with_family_head_relationship(): void
+    {
+        $family = Family::query()->create([
+            'name' => 'Shaik Nanne Saheb Family',
+            'slug' => 'shaik-nanne-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $admin = User::query()->create([
+            'name' => 'Family Admin',
+            'email' => 'admin@example.com',
+            'password' => 'password123',
+            'role' => User::ROLE_ADMIN,
+            'family_id' => $family->id,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+
+        $familyHead = FamilyMember::query()->create([
+            'family_id' => $family->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Nanne Saheb',
+            'is_living' => false,
+            'is_private' => false,
+            'created_by' => $admin->id,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/v1/family-members', [
+            'family_id' => $family->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Madar Saheb',
+            'gender' => 'male',
+            'birth_date' => '',
+            'email' => '',
+            'phone' => '',
+            'current_city' => 'Kadapa',
+            'current_country' => 'India',
+            'family_head_id' => $familyHead->id,
+            'relationship_to_family_head' => 'son',
+            'marital_status' => 'unmarried',
+            'living_status' => 'living',
+            'is_living' => true,
+            'is_private' => false,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.member.first_name', 'Shaik')
+            ->assertJsonPath('data.member.relation_to_family_head', 'son')
+            ->assertJsonPath('data.family', null);
+
+        $memberId = $response->json('data.member.id');
+
+        $this->assertDatabaseHas('family_relationships', [
+            'family_id' => $family->id,
+            'from_member_id' => $familyHead->id,
+            'to_member_id' => $memberId,
+            'relationship_type' => FamilyRelationship::TYPE_PARENT,
+            'created_by' => $admin->id,
+        ]);
+    }
 
     public function test_admin_can_update_member_profile_fields_from_edit_form_aliases(): void
     {

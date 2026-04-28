@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -45,20 +46,25 @@ class FamilyMemberController extends Controller
         $family = $this->accessibleFamily($request, (int) $data['family_id'], false);
         $familyHead = $this->familyHead($family, $data);
 
-        $member = FamilyMember::query()->create([
-            ...$this->memberFields($data),
-            'family_id' => $family->id,
-            'created_by' => $request->user()->id,
-        ]);
+        [$member, $newFamily] = DB::transaction(function () use ($request, $data, $family, $familyHead): array {
+            $member = FamilyMember::query()->create([
+                ...$this->memberFields($data),
+                'family_id' => $family->id,
+                'created_by' => $request->user()->id,
+            ]);
 
-        $this->connectToFamilyHead(
-            $family,
-            $familyHead,
-            $member,
-            $data['relationship_to_family_head'] ?? $data['relation_to_family_head'] ?? null,
-            $request->user()
-        );
-        $newFamily = $this->createMarriedFamily($request, $member, $data['marital_status'] ?? null);
+            $this->connectToFamilyHead(
+                $family,
+                $familyHead,
+                $member,
+                $data['relationship_to_family_head'] ?? $data['relation_to_family_head'] ?? null,
+                $request->user()
+            );
+
+            $newFamily = $this->createMarriedFamily($request, $member, $data['marital_status'] ?? null);
+
+            return [$member, $newFamily];
+        });
 
         return response()->json([
             'status' => true,
