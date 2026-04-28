@@ -7,6 +7,7 @@ use App\Models\Family;
 use App\Models\FamilyMember;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -182,7 +183,7 @@ class FamilyMemberController extends Controller
                 'nullable',
                 'integer',
                 Rule::exists('family_members', 'id')->where(
-                    fn (Builder $query) => $query->where('family_id', $request->integer('family_id'))
+                    fn (QueryBuilder $query) => $query->where('family_id', $request->integer('family_id'))
                 ),
             ],
             'relation_to_family_head' => ['sometimes', 'nullable', 'string', Rule::in($this->relationshipOptions())],
