@@ -39,6 +39,9 @@ const treeRoutes = {
 const emptyForm = {
   family_id: '',
   tree_family_id: '',
+  add_member_type: 'spouse',
+  existing_person_id: '',
+  household_id: '',
   first_name: '',
   last_name: '',
   gender: '',
@@ -51,9 +54,16 @@ const emptyForm = {
   current_country: '',
   family_head_id: '',
   relationship_to_family_head: '',
-  marital_status: 'unmarried',
+  marital_status: 'married',
   living_status: 'living',
 };
+
+const addMemberTypeOptions = [
+  ['spouse', 'Add Spouse', false],
+  ['child', 'Add Child', false],
+  ['parent', 'Add Parent', true],
+  ['existing_to_household', 'Add Existing Person to Household', true],
+];
 
 const relationshipOptions = [
   ['father', 'Father'],
@@ -75,6 +85,7 @@ export function MembersPage({ role }) {
   const { logout, token, user } = useAuth();
   const [families, setFamilies] = useState([]);
   const [members, setMembers] = useState([]);
+  const [households, setHouseholds] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -89,6 +100,9 @@ export function MembersPage({ role }) {
   const isMemberFormOpen = isAddingMember || Boolean(editingMember);
   const isEditingMember = Boolean(editingMember);
   const selectedFamilyId = form.family_id || directoryFamilyId || families[0]?.id || user.family_id || '';
+  const canSubmitMemberForm = isEditingMember
+    ? Boolean(selectedFamilyId && form.first_name)
+    : Boolean(selectedFamilyId && form.first_name && canSubmitAddMemberType(form.add_member_type));
 
   const stats = useMemo(() => {
     const livingCount = members.filter((member) => member.is_living).length;
@@ -111,7 +125,10 @@ export function MembersPage({ role }) {
       try {
         const nextFamilies = await familyApi.listFamilies(token);
         const firstFamilyId = nextFamilies[0]?.id ?? user.family_id ?? '';
-        const nextMembers = await familyApi.listMembers(token, firstFamilyId);
+        const [nextMembers, nextHouseholds] = await Promise.all([
+          familyApi.listMembers(token, firstFamilyId),
+          familyApi.listHouseholds(token, firstFamilyId),
+        ]);
 
         if (!isMounted) {
           return;
@@ -119,6 +136,7 @@ export function MembersPage({ role }) {
 
         setFamilies(nextFamilies);
         setMembers(nextMembers);
+        setHouseholds(nextHouseholds);
         setDirectoryFamilyId(firstFamilyId);
         setForm((current) => ({
           ...current,
@@ -149,10 +167,15 @@ export function MembersPage({ role }) {
     setIsSubmitting(true);
 
     try {
+      const addMemberType = isEditingMember ? null : form.add_member_type;
       const payload = {
         ...form,
         family_id: Number(isEditingMember ? form.tree_family_id || editingMember.family_id : selectedFamilyId),
-        family_head_id: form.family_head_id ? Number(form.family_head_id) : null,
+        add_member_type: addMemberType,
+        existing_person_id: addMemberType === 'spouse' && form.existing_person_id ? Number(form.existing_person_id) : null,
+        household_id: addMemberType === 'child' && form.household_id ? Number(form.household_id) : null,
+        family_head_id: isEditingMember && form.family_head_id ? Number(form.family_head_id) : null,
+        relationship_to_family_head: isEditingMember ? form.relationship_to_family_head : null,
         is_living: form.living_status === 'living',
         death_date: form.living_status === 'deceased' ? form.death_date : null,
         graveyard_location: form.living_status === 'deceased' ? form.graveyard_location : null,
@@ -171,15 +194,10 @@ export function MembersPage({ role }) {
       }
 
       const result = await familyApi.createMember(token, payload);
-      const member = result.member;
-
-      setMembers((current) => [...current, member].sort(sortMembers));
-      if (result.family) {
-        setFamilies((current) => [...current, result.family].sort(sortFamilies));
-      }
+      await loadFamilyContext(selectedFamilyId);
       setDirectoryFamilyId(selectedFamilyId);
       setForm({ ...emptyForm, family_id: selectedFamilyId });
-      setSuccess(result.family ? `Family member added. ${result.family.name} was created.` : 'Family member added.');
+      setSuccess(createMemberSuccessMessage(result));
       setIsAddingMember(false);
     } catch (submitError) {
       setError(submitError.message);
@@ -201,6 +219,16 @@ export function MembersPage({ role }) {
     }
   }
 
+  async function loadFamilyContext(nextFamilyId) {
+    const [nextMembers, nextHouseholds] = await Promise.all([
+      familyApi.listMembers(token, nextFamilyId),
+      familyApi.listHouseholds(token, nextFamilyId),
+    ]);
+
+    setMembers(nextMembers);
+    setHouseholds(nextHouseholds);
+  }
+
   async function handleDirectoryFamilyChange(nextFamilyId) {
     setDirectoryFamilyId(nextFamilyId);
     setForm((current) => ({ ...current, family_id: nextFamilyId }));
@@ -209,8 +237,28 @@ export function MembersPage({ role }) {
     setIsLoading(true);
 
     try {
-      const nextMembers = await familyApi.listMembers(token, nextFamilyId);
-      setMembers(nextMembers);
+      await loadFamilyContext(nextFamilyId);
+    } catch (loadError) {
+      setError(loadError.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleFormFamilyChange(nextFamilyId) {
+    setDirectoryFamilyId(nextFamilyId);
+    setForm((current) => ({
+      ...current,
+      family_id: nextFamilyId,
+      existing_person_id: '',
+      household_id: '',
+    }));
+    setError('');
+    setSuccess('');
+    setIsLoading(true);
+
+    try {
+      await loadFamilyContext(nextFamilyId);
     } catch (loadError) {
       setError(loadError.message);
     } finally {
@@ -220,6 +268,16 @@ export function MembersPage({ role }) {
 
   function updateForm(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateAddMemberType(value) {
+    setForm((current) => ({
+      ...current,
+      add_member_type: value,
+      existing_person_id: '',
+      household_id: '',
+      marital_status: value === 'child' ? 'unmarried' : 'married',
+    }));
   }
 
   function showAddMemberForm() {
@@ -321,7 +379,7 @@ export function MembersPage({ role }) {
                 <p>
                   {isEditingMember
                     ? 'Update the existing member profile.'
-                    : 'Capture the member profile and attach the first relationship to the family head.'}
+                    : 'Create a spouse or child record and attach it to the right household.'}
                 </p>
               </div>
               <Button onClick={hideAddMemberForm} type="button" variant="outline">
@@ -335,7 +393,7 @@ export function MembersPage({ role }) {
                   Family
                   <select
                     value={form.family_id}
-                    onChange={(event) => updateForm('family_id', event.target.value)}
+                    onChange={(event) => handleFormFamilyChange(event.target.value)}
                     disabled={isEditingMember}
                     required
                   >
@@ -346,6 +404,69 @@ export function MembersPage({ role }) {
                     ))}
                   </select>
                 </label>
+              ) : null}
+
+              {!isEditingMember ? (
+                <>
+                  <label className="field-group member-form-wide">
+                    Add Member Type
+                    <select
+                      value={form.add_member_type}
+                      onChange={(event) => updateAddMemberType(event.target.value)}
+                      required
+                    >
+                      {addMemberTypeOptions.map(([value, label, isDisabled]) => (
+                        <option disabled={isDisabled} key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {form.add_member_type === 'spouse' ? (
+                    <label className="field-group member-form-wide">
+                      Existing person
+                      <select
+                        value={form.existing_person_id}
+                        onChange={(event) => updateForm('existing_person_id', event.target.value)}
+                        required
+                      >
+                        <option value="">Select existing person</option>
+                        {members.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.display_name}
+                          </option>
+                        ))}
+                      </select>
+                      <small>
+                        Select the person this new spouse should be linked to.
+                        {members.length === 0 ? ' No members are loaded for this family yet.' : ''}
+                      </small>
+                    </label>
+                  ) : null}
+
+                  {form.add_member_type === 'child' ? (
+                    <label className="field-group member-form-wide">
+                      Household / Couple Family
+                      <select
+                        value={form.household_id}
+                        onChange={(event) => updateForm('household_id', event.target.value)}
+                        required
+                      >
+                        <option value="">Select household</option>
+                        {households.map((household) => (
+                          <option key={household.id} value={household.id}>
+                            {household.name}
+                          </option>
+                        ))}
+                      </select>
+                      <small>
+                        Select the couple household this child belongs to.
+                        {households.length === 0 ? ' Add a spouse first to create a household.' : ''}
+                      </small>
+                    </label>
+                  ) : null}
+                </>
               ) : null}
 
               <Input
@@ -410,38 +531,6 @@ export function MembersPage({ role }) {
                 fullWidth
               />
 
-              <label className="field-group">
-                Select Family Head
-                <select
-                  value={form.family_head_id}
-                  onChange={(event) => updateForm('family_head_id', event.target.value)}
-                  required={!isEditingMember}
-                >
-                  <option value="">Select family head</option>
-                  {members.filter((member) => member.id !== editingMember?.id).map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.display_name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="field-group">
-                Relation to Family Head
-                <select
-                  value={form.relationship_to_family_head}
-                  onChange={(event) => updateForm('relationship_to_family_head', event.target.value)}
-                  required={!isEditingMember}
-                >
-                  <option value="">Select relation</option>
-                  {relationshipOptions.map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
               <label className="field-group member-form-wide">
                 Married / Unmarried
                 <select
@@ -500,11 +589,7 @@ export function MembersPage({ role }) {
 
               <Button
                 className="member-form-action"
-                disabled={
-                  isSubmitting ||
-                  !selectedFamilyId ||
-                  (!isEditingMember && (!form.family_head_id || !form.relationship_to_family_head))
-                }
+                disabled={isSubmitting || !canSubmitMemberForm}
                 isLoading={isSubmitting}
                 type="submit"
               >
@@ -539,7 +624,9 @@ export function MembersPage({ role }) {
                 <div className="member-main">
                   <div className="member-title-line">
                     <strong>{member.display_name}</strong>
-                    {member.display_family_name ? <Badge variant="neutral">{member.display_family_name}</Badge> : null}
+                    {member.household_name || member.display_family_name ? (
+                      <Badge variant="neutral">{member.household_name ?? member.display_family_name}</Badge>
+                    ) : null}
                   </div>
                   <p>
                     {[member.current_city, member.current_country].filter(Boolean).join(', ') ||
@@ -566,6 +653,7 @@ export function MembersPage({ role }) {
                         {relationshipLabel(member.relation_to_family_head)} of {member.family_head_name}
                       </span>
                     ) : null}
+                    {member.household_name ? <span>Household: {member.household_name}</span> : null}
                   </div>
                 </div>
                 <div className="member-meta">
@@ -614,8 +702,16 @@ function sortMembers(first, second) {
   return first.display_name.localeCompare(second.display_name);
 }
 
-function sortFamilies(first, second) {
-  return first.name.localeCompare(second.name);
+function canSubmitAddMemberType(addMemberType) {
+  return ['spouse', 'child'].includes(addMemberType);
+}
+
+function createMemberSuccessMessage(result) {
+  if (result.household?.name) {
+    return `Family member added to ${result.household.name}.`;
+  }
+
+  return 'Family member added.';
 }
 
 function initials(name) {

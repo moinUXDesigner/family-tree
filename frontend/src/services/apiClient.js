@@ -1,11 +1,12 @@
 import { apiConfig } from '../config/api.js';
 
 async function request(path, options = {}) {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const response = await fetch(`${apiConfig.baseUrl}${path}`, {
     ...options,
     headers: {
       Accept: 'application/json',
-      'Content-Type': 'application/json',
+      ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
       ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
       ...options.headers,
     },
@@ -16,8 +17,8 @@ async function request(path, options = {}) {
   if (!response.ok) {
     const validationMessage = payload.errors ? Object.values(payload.errors).flat()[0] : null;
     const message =
-      payload.message ??
       validationMessage ??
+      payload.message ??
       payload.errors?.email?.[0] ??
       payload.errors?.password?.[0] ??
       'Request failed.';
@@ -38,6 +39,13 @@ export const apiClient = {
     return request(path, {
       method: 'POST',
       body: JSON.stringify(body),
+      token,
+    });
+  },
+  postForm(path, body, token) {
+    return request(path, {
+      method: 'POST',
+      body,
       token,
     });
   },

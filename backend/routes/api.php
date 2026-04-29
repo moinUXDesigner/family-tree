@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\FamilyController;
 use App\Http\Controllers\Api\FamilyMemberController;
 use App\Http\Controllers\Api\FamilyRelationshipController;
 use App\Http\Controllers\Api\FamilyTreeController;
+use App\Http\Controllers\Api\FeedbackController;
+use App\Http\Controllers\Api\HouseholdController;
 use App\Http\Controllers\Api\RootFamilyController;
 use App\Http\Controllers\Api\UserApprovalController;
 use App\Http\Controllers\Api\UserManagementController;
@@ -32,7 +34,9 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/family-members', [FamilyMemberController::class, 'index']);
             Route::post('/family-members', [FamilyMemberController::class, 'store']);
             Route::get('/family-relationships', [FamilyRelationshipController::class, 'index']);
+            Route::get('/households', [HouseholdController::class, 'index']);
             Route::get('/family-tree', [FamilyTreeController::class, 'show']);
+            Route::post('/feedback', [FeedbackController::class, 'store']);
             Route::get('/family-connection', [FamilyConnectionController::class, 'status']);
             Route::post('/family-connection', [FamilyConnectionController::class, 'connect']);
         });
@@ -42,6 +46,8 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/family-members/{familyMember}', [FamilyMemberController::class, 'destroy']);
             Route::post('/family-relationships', [FamilyRelationshipController::class, 'store']);
             Route::delete('/family-relationships/{familyRelationship}', [FamilyRelationshipController::class, 'destroy']);
+            Route::get('/feedback', [FeedbackController::class, 'index']);
+            Route::put('/feedback/{feedbackSubmission}', [FeedbackController::class, 'update']);
         });
 
         Route::middleware('role:super_admin')->group(function (): void {

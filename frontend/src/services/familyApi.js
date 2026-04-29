@@ -21,6 +21,12 @@ export const familyApi = {
     return response.data.members;
   },
 
+  async listHouseholds(token, familyId) {
+    const query = familyId ? `?family_id=${familyId}` : '';
+    const response = await apiClient.get(`/households${query}`, token);
+    return response.data.households;
+  },
+
   async createMember(token, payload) {
     const response = await apiClient.post('/family-members', payload, token);
     return response.data;

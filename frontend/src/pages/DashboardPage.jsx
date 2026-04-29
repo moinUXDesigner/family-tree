@@ -300,15 +300,14 @@ function buildFocusTree(tree, focusedMemberId, userId) {
   const spouseLinks = tree.links.filter((link) => link.relationship_type === 'spouse');
   const siblingLinks = tree.links.filter((link) => link.relationship_type === 'sibling');
 
+  const spouseIds = spouseMemberIds(focusNode.id, spouseLinks);
   const parentIds = parentLinks
     .filter((link) => link.to_member_id === focusNode.id)
     .map((link) => link.from_member_id);
+  const inferredParentIds = parentIds.flatMap((parentId) => spouseMemberIds(parentId, spouseLinks));
   const childIds = parentLinks
-    .filter((link) => link.from_member_id === focusNode.id)
+    .filter((link) => link.from_member_id === focusNode.id || spouseIds.includes(link.from_member_id))
     .map((link) => link.to_member_id);
-  const spouseIds = spouseLinks
-    .filter((link) => link.from_member_id === focusNode.id || link.to_member_id === focusNode.id)
-    .map((link) => (link.from_member_id === focusNode.id ? link.to_member_id : link.from_member_id));
   const siblingIdsFromParents = parentLinks
     .filter((link) => parentIds.includes(link.from_member_id) && link.to_member_id !== focusNode.id)
     .map((link) => link.to_member_id);
@@ -318,11 +317,17 @@ function buildFocusTree(tree, focusedMemberId, userId) {
 
   return {
     focus: personFromNode(focusNode, userId),
-    parents: peopleFromIds(parentIds, nodeMap, userId),
+    parents: peopleFromIds([...parentIds, ...inferredParentIds], nodeMap, userId),
     spouses: peopleFromIds(spouseIds, nodeMap, userId),
     children: peopleFromIds(childIds, nodeMap, userId),
     siblings: peopleFromIds([...siblingIdsFromParents, ...siblingIdsFromLinks], nodeMap, userId),
   };
+}
+
+function spouseMemberIds(memberId, spouseLinks) {
+  return spouseLinks
+    .filter((link) => link.from_member_id === memberId || link.to_member_id === memberId)
+    .map((link) => (link.from_member_id === memberId ? link.to_member_id : link.from_member_id));
 }
 
 function peopleFromIds(ids, nodeMap, userId) {

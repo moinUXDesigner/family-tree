@@ -5,6 +5,8 @@ import { ApprovalsPage } from './pages/ApprovalsPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { FamiliesPage } from './pages/FamiliesPage.jsx';
 import { FamilyConnectionPage } from './pages/FamilyConnectionPage.jsx';
+import { FeedbackInboxPage } from './pages/FeedbackInboxPage.jsx';
+import { FeedbackPage } from './pages/FeedbackPage.jsx';
 import { MembersPage } from './pages/MembersPage.jsx';
 import { RelationshipsPage } from './pages/RelationshipsPage.jsx';
 import { RootFamilyPage } from './pages/RootFamilyPage.jsx';
@@ -57,6 +59,8 @@ export function App() {
           />
           <Route path="/super-admin/root-family" element={<RootFamilyPage />} />
           <Route path="/super-admin/tree" element={<TreePage role={ROLES.SUPER_ADMIN} />} />
+          <Route path="/super-admin/feedback" element={<FeedbackPage role={ROLES.SUPER_ADMIN} />} />
+          <Route path="/super-admin/feedbacks" element={<FeedbackInboxPage role={ROLES.SUPER_ADMIN} />} />
         </Route>
 
         <Route element={<RequireRole roles={[ROLES.ADMIN]} />}>
@@ -64,10 +68,13 @@ export function App() {
           <Route path="/admin/members" element={<MembersPage role={ROLES.ADMIN} />} />
           <Route path="/admin/relationships" element={<RelationshipsPage role={ROLES.ADMIN} />} />
           <Route path="/admin/tree" element={<TreePage role={ROLES.ADMIN} />} />
+          <Route path="/admin/feedback" element={<FeedbackPage role={ROLES.ADMIN} />} />
+          <Route path="/admin/feedbacks" element={<FeedbackInboxPage role={ROLES.ADMIN} />} />
         </Route>
 
         <Route element={<RequireRole roles={[ROLES.USER]} />}>
           <Route path="/app/connect" element={<FamilyConnectionPage />} />
+          <Route path="/app/feedback" element={<FeedbackPage role={ROLES.USER} />} />
           <Route element={<RequireFamilyConnection />}>
             <Route path="/app/dashboard" element={<DashboardPage role={ROLES.USER} />} />
             <Route path="/app/members" element={<MembersPage role={ROLES.USER} />} />

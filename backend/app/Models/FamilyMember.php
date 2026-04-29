@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
@@ -82,6 +83,24 @@ class FamilyMember extends Model
     public function relationshipsTo(): HasMany
     {
         return $this->hasMany(FamilyRelationship::class, 'to_member_id');
+    }
+
+    /**
+     * @return HasMany<HouseholdMember, $this>
+     */
+    public function householdMemberships(): HasMany
+    {
+        return $this->hasMany(HouseholdMember::class, 'member_id');
+    }
+
+    /**
+     * @return BelongsToMany<Household, $this>
+     */
+    public function households(): BelongsToMany
+    {
+        return $this->belongsToMany(Household::class, 'household_members', 'member_id', 'household_id')
+            ->withPivot('role')
+            ->withTimestamps();
     }
 
     /**

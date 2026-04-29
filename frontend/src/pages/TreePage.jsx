@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { LogOut, Network, RotateCcw, UsersRound } from 'lucide-react';
+import { ChevronDown, ChevronRight, LogOut, Network, RotateCcw, UsersRound } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLE_HOME, ROLE_LABELS, ROLES } from '../config/roles.js';
 import { NavigationChrome } from '../app/NavigationChrome.jsx';
@@ -139,15 +139,12 @@ export function TreePage({ role }) {
     <main className="dashboard-page">
       <NavigationChrome active="tree" role={role} />
 
-      <section className="dashboard-content">
+      <section className="dashboard-content tree-dashboard-content">
         <header className="dashboard-header">
           <div>
             <Badge variant="primary">{ROLE_LABELS[user.role]}</Badge>
             <h1>{tree.family?.name ?? 'Family Tree'}</h1>
-            <p>
-              Select a family member to view that person as Self with their parents,
-              spouse, siblings, and children.
-            </p>
+            <p>Tap a person to view parents, spouse, children, and siblings.</p>
           </div>
           <Button onClick={logout} type="button" variant="outline">
             <LogOut aria-hidden="true" />
@@ -185,8 +182,8 @@ export function TreePage({ role }) {
         ) : null}
 
         <section className="tree-layout">
-          <Card padding="lg" variant="elevated">
-            <div className="section-heading">
+          <Card className="tree-graph-card" padding="lg" variant="elevated">
+            <div className="section-heading tree-desktop-heading">
               <div>
                 <h2>Tree graph</h2>
                 <p>
@@ -227,61 +224,192 @@ export function TreePage({ role }) {
 
 function FocusedFamilyGraph({ family, familyHeadId, focusMemberId, onFocus }) {
   return (
-    <div className="focused-tree-canvas">
-      <TreeRelationSection
-        emptyLabel="Parents not added"
-        members={family.parents}
-        onFocus={onFocus}
-        title="Parents"
-      />
+    <>
+      <div className="focused-tree-canvas desktop-tree-canvas">
+        <TreeRelationSection
+          emptyLabel="Parents not added"
+          members={family.parents}
+          onFocus={onFocus}
+          title="Parents"
+        />
 
-      <section className="tree-relation-section self-section" aria-label="Selected person and spouse">
-        <div className="tree-section-title">
-          <span>Self</span>
+        <section className="tree-relation-section self-section" aria-label="Selected person and spouse">
+          <div className="tree-section-title">
+            <span>Self</span>
+          </div>
+          <div className="tree-self-row">
+            <TreePersonCard
+              isFamilyHead={family.self.id === familyHeadId}
+              isFocused
+              member={family.self}
+              onFocus={onFocus}
+            />
+            <div className="tree-spouse-group">
+              <span>Spouse</span>
+              {family.spouses.length > 0 ? (
+                <div className="tree-card-grid compact">
+                  {family.spouses.map((member) => (
+                    <TreePersonCard key={member.id} member={member} onFocus={onFocus} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyTreeSlot label="Spouse not added" />
+              )}
+            </div>
+          </div>
+          {focusMemberId !== familyHeadId ? (
+            <button className="tree-reset-button" onClick={() => onFocus(familyHeadId)} type="button">
+              <RotateCcw aria-hidden="true" size={16} />
+              Family head
+            </button>
+          ) : null}
+        </section>
+
+        <TreeRelationSection
+          emptyLabel="Siblings not added"
+          members={family.siblings}
+          onFocus={onFocus}
+          title="Siblings"
+        />
+
+        <TreeRelationSection
+          emptyLabel="Children not added"
+          members={family.children}
+          onFocus={onFocus}
+          title="Children"
+        />
+      </div>
+
+      <MobileFocusedFamilyGraph family={family} familyHeadId={familyHeadId} onFocus={onFocus} />
+    </>
+  );
+}
+
+function MobileFocusedFamilyGraph({ family, familyHeadId, onFocus }) {
+  return (
+    <div className="mobile-tree-card">
+      <div className="mobile-tree-panel-header">
+        <Network aria-hidden="true" />
+        <strong>Family Tree</strong>
+      </div>
+
+      <div className="mobile-tree-panel-body">
+        <MobileSectionLabel tone="green">Parents</MobileSectionLabel>
+        <div className="mobile-family-pair parents">
+          {family.parents.length > 0 ? (
+            family.parents.map((member) => (
+              <MobilePersonBubble key={member.id} member={member} onFocus={onFocus} showYears />
+            ))
+          ) : (
+            <MobileEmptyState label="Parents not added" />
+          )}
         </div>
-        <div className="tree-self-row">
-          <TreePersonCard
-            isFamilyHead={family.self.id === familyHeadId}
-            isFocused
-            member={family.self}
-            onFocus={onFocus}
-          />
-          <div className="tree-spouse-group">
-            <span>Spouse</span>
+
+        <div className="mobile-tree-connector" aria-hidden="true" />
+
+        <section className="mobile-couple-box" aria-label="Selected person and spouse">
+          <MobileSectionLabel tone="blue">You & Spouse</MobileSectionLabel>
+          <div className="mobile-family-pair couple">
+            <MobilePersonBubble
+              isFamilyHead={family.self.id === familyHeadId}
+              isFocused
+              member={family.self}
+              onFocus={onFocus}
+            />
             {family.spouses.length > 0 ? (
-              <div className="tree-card-grid compact">
-                {family.spouses.map((member) => (
-                  <TreePersonCard key={member.id} member={member} onFocus={onFocus} />
-                ))}
-              </div>
+              family.spouses.map((member) => (
+                <MobilePersonBubble key={member.id} member={member} onFocus={onFocus} />
+              ))
             ) : (
-              <EmptyTreeSlot label="Spouse not added" />
+              <MobileEmptyState label="Spouse not added" />
             )}
           </div>
+        </section>
+
+        <div className="mobile-tree-connector" aria-hidden="true" />
+
+        <MobileSectionLabel tone="amber">Siblings</MobileSectionLabel>
+        <div className="mobile-tree-list" aria-label="Siblings">
+          {family.siblings.length > 0 ? (
+            family.siblings.map((member) => (
+              <MobilePersonRow key={member.id} member={member} onFocus={onFocus} />
+            ))
+          ) : (
+            <MobileEmptyState label="Siblings not added" />
+          )}
         </div>
-        {focusMemberId !== familyHeadId ? (
-          <button className="tree-reset-button" onClick={() => onFocus(familyHeadId)} type="button">
-            <RotateCcw aria-hidden="true" size={16} />
-            Family head
-          </button>
-        ) : null}
-      </section>
 
-      <TreeRelationSection
-        emptyLabel="Siblings not added"
-        members={family.siblings}
-        onFocus={onFocus}
-        title="Siblings"
-      />
-
-      <TreeRelationSection
-        emptyLabel="Children not added"
-        members={family.children}
-        onFocus={onFocus}
-        title="Children"
-      />
+        <details className="mobile-tree-accordion">
+          <summary>
+            <span>
+              <UsersRound aria-hidden="true" />
+              Children
+            </span>
+            <span className="mobile-tree-action">
+              Tap to view
+              <ChevronDown aria-hidden="true" />
+            </span>
+          </summary>
+          <div className="mobile-tree-list children">
+            {family.children.length > 0 ? (
+              family.children.map((member) => (
+                <MobilePersonRow key={member.id} member={member} onFocus={onFocus} />
+              ))
+            ) : (
+              <MobileEmptyState label="Children not added" />
+            )}
+          </div>
+        </details>
+      </div>
     </div>
   );
+}
+
+function MobileSectionLabel({ children, tone }) {
+  return (
+    <div className="mobile-section-line">
+      <span className={`mobile-section-label ${tone}`}>{children}</span>
+    </div>
+  );
+}
+
+function MobilePersonBubble({ isFamilyHead = false, isFocused = false, member, onFocus, showYears = false }) {
+  return (
+    <button className="mobile-person-bubble" onClick={() => onFocus(member.id)} type="button">
+      <span
+        className={[
+          'mobile-person-avatar',
+          genderClass(member.gender),
+          isFocused ? 'focused' : '',
+          isFamilyHead ? 'family-head' : '',
+        ].filter(Boolean).join(' ')}
+        aria-hidden="true"
+      >
+        {initials(member.name)}
+      </span>
+      <strong>{member.name}</strong>
+      {showYears ? <small>{lifeYears(member)}</small> : null}
+    </button>
+  );
+}
+
+function MobilePersonRow({ member, onFocus }) {
+  return (
+    <button className="mobile-person-row" onClick={() => onFocus(member.id)} type="button">
+      <span className={`mobile-row-avatar ${genderClass(member.gender)}`} aria-hidden="true">
+        {initials(member.name)}
+      </span>
+      <span>
+        <strong>{member.name}</strong>
+        <small>{year(member.birth_date) ?? (member.is_living ? 'Living' : 'Deceased')}</small>
+      </span>
+      <ChevronRight aria-hidden="true" />
+    </button>
+  );
+}
+
+function MobileEmptyState({ label }) {
+  return <div className="mobile-tree-empty">{label}</div>;
 }
 
 function TreeRelationSection({ emptyLabel, members, onFocus, title }) {
@@ -310,7 +438,7 @@ function TreePersonCard({ isFamilyHead = false, isFocused = false, member, onFoc
       onClick={() => onFocus(member.id)}
       type="button"
     >
-      <span className={`tree-person-avatar ${member.gender || 'unknown'}`} aria-hidden="true">
+      <span className={`tree-person-avatar ${genderClass(member.gender)}`} aria-hidden="true">
         {initials(member.name)}
       </span>
       <span className="tree-person-copy">
@@ -343,15 +471,18 @@ function buildFocusedFamily(focusMemberId, nodeMap, links) {
   }
 
   const parentLinks = links.filter((link) => link.relationship_type === 'parent');
+  const spouseLinks = links.filter((link) => link.relationship_type === 'spouse');
+  const spouseIds = spouseMemberIds(focusMemberId, spouseLinks);
   const parents = uniqueNodes(
     parentLinks
       .filter((link) => link.to_member_id === focusMemberId)
       .map((link) => nodeMap.get(link.from_member_id)),
   );
   const parentIds = new Set(parents.map((parent) => parent.id));
+  const inferredParentIds = [...parentIds].flatMap((parentId) => spouseMemberIds(parentId, spouseLinks));
   const children = uniqueNodes(
     parentLinks
-      .filter((link) => link.from_member_id === focusMemberId)
+      .filter((link) => link.from_member_id === focusMemberId || spouseIds.includes(link.from_member_id))
       .map((link) => nodeMap.get(link.to_member_id)),
   );
   const siblingsFromParents = parentLinks
@@ -365,22 +496,25 @@ function buildFocusedFamily(focusMemberId, nodeMap, links) {
     )
     .map((link) => nodeMap.get(link.from_member_id === focusMemberId ? link.to_member_id : link.from_member_id));
   const spouses = uniqueNodes(
-    links
-      .filter(
-        (link) =>
-          link.relationship_type === 'spouse' &&
-          (link.from_member_id === focusMemberId || link.to_member_id === focusMemberId),
-      )
-      .map((link) => nodeMap.get(link.from_member_id === focusMemberId ? link.to_member_id : link.from_member_id)),
+    spouseIds.map((id) => nodeMap.get(id)),
   );
 
   return {
     children,
-    parents,
+    parents: uniqueNodes([
+      ...parents,
+      ...inferredParentIds.map((id) => nodeMap.get(id)),
+    ]),
     self,
     siblings: uniqueNodes([...siblingsFromParents, ...siblingsFromLinks]),
     spouses,
   };
+}
+
+function spouseMemberIds(memberId, spouseLinks) {
+  return spouseLinks
+    .filter((link) => link.from_member_id === memberId || link.to_member_id === memberId)
+    .map((link) => (link.from_member_id === memberId ? link.to_member_id : link.from_member_id));
 }
 
 function chooseFamilyHeadId(nodes, links, rootMemberIds) {
@@ -428,6 +562,39 @@ function uniqueNodes(nodes) {
   });
 
   return [...map.values()].sort((first, second) => first.name.localeCompare(second.name));
+}
+
+function genderClass(gender) {
+  return ['male', 'female'].includes(gender) ? gender : 'unknown';
+}
+
+function year(value) {
+  if (!value) {
+    return null;
+  }
+
+  const match = String(value).match(/\d{4}/);
+
+  return match ? match[0] : null;
+}
+
+function lifeYears(member) {
+  const birthYear = year(member.birth_date);
+  const deathYear = year(member.death_date);
+
+  if (birthYear && deathYear) {
+    return `${birthYear} - ${deathYear}`;
+  }
+
+  if (birthYear) {
+    return member.is_living ? birthYear : `${birthYear} -`;
+  }
+
+  if (deathYear) {
+    return `Died ${deathYear}`;
+  }
+
+  return member.is_living ? 'Living' : 'Deceased';
 }
 
 function initials(name) {

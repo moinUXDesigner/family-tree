@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Family;
 use App\Models\FamilyMember;
 use App\Models\FamilyRelationship;
+use App\Models\Household;
+use App\Models\HouseholdMember;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -75,6 +77,534 @@ class FamilyMemberUpdateTest extends TestCase
             'to_member_id' => $memberId,
             'relationship_type' => FamilyRelationship::TYPE_PARENT,
             'created_by' => $admin->id,
+        ]);
+    }
+
+    public function test_admin_can_add_spouse_without_creating_spouse_name_family(): void
+    {
+        $family = Family::query()->create([
+            'name' => 'Shaik Nanne Saheb Family',
+            'slug' => 'shaik-nanne-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $admin = User::query()->create([
+            'name' => 'Family Admin',
+            'email' => 'admin@example.com',
+            'password' => 'password123',
+            'role' => User::ROLE_ADMIN,
+            'family_id' => $family->id,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+
+        $madar = FamilyMember::query()->create([
+            'family_id' => $family->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Madar Saheb',
+            'gender' => 'male',
+            'marital_status' => 'unmarried',
+            'is_living' => false,
+            'is_private' => false,
+            'created_by' => $admin->id,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/v1/family-members', [
+            'family_id' => $family->id,
+            'add_member_type' => 'spouse',
+            'existing_person_id' => $madar->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Chand Begum',
+            'gender' => 'female',
+            'marital_status' => 'married',
+            'living_status' => 'living',
+            'is_private' => false,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.member.relation_to_family_head', 'spouse')
+            ->assertJsonPath('data.family', null)
+            ->assertJsonPath('data.household.name', 'Shaik Madar Saheb & Shaik Chand Begum Family');
+
+        $spouseId = $response->json('data.member.id');
+        $householdId = $response->json('data.household.id');
+
+        $this->assertDatabaseHas('family_relationships', [
+            'family_id' => $family->id,
+            'from_member_id' => $madar->id,
+            'to_member_id' => $spouseId,
+            'relationship_type' => FamilyRelationship::TYPE_SPOUSE,
+            'created_by' => $admin->id,
+        ]);
+
+        $this->assertDatabaseHas('households', [
+            'id' => $householdId,
+            'family_id' => $family->id,
+            'name' => 'Shaik Madar Saheb & Shaik Chand Begum Family',
+            'primary_person_id' => $madar->id,
+            'spouse_person_id' => $spouseId,
+            'created_by' => $admin->id,
+        ]);
+
+        $this->assertDatabaseHas('household_members', [
+            'household_id' => $householdId,
+            'member_id' => $madar->id,
+            'role' => Household::ROLE_HUSBAND,
+        ]);
+
+        $this->assertDatabaseHas('household_members', [
+            'household_id' => $householdId,
+            'member_id' => $spouseId,
+            'role' => Household::ROLE_WIFE,
+        ]);
+
+        $this->assertSame(
+            0,
+            Family::query()->whereIn('name', [
+                'Shaik Madar Saheb Family',
+                'Shaik Chand Begum Family',
+            ])->count()
+        );
+    }
+
+    public function test_super_admin_can_load_members_from_legacy_branch_family_alias(): void
+    {
+        $rootFamily = Family::query()->create([
+            'name' => 'Shaik Nanne Saheb Family',
+            'slug' => 'shaik-nanne-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $branchFamily = Family::query()->create([
+            'name' => 'Shaik Madar Saheb Family',
+            'slug' => 'shaik-madar-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $superAdmin = User::query()->create([
+            'name' => 'Super Admin',
+            'email' => 'superadmin@example.com',
+            'password' => 'password123',
+            'role' => User::ROLE_SUPER_ADMIN,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+
+        $madar = FamilyMember::query()->create([
+            'family_id' => $rootFamily->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Madar Saheb',
+            'gender' => 'male',
+            'is_living' => false,
+            'is_private' => false,
+            'created_by' => $superAdmin->id,
+        ]);
+
+        $chand = FamilyMember::query()->create([
+            'family_id' => $rootFamily->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Chand Begum',
+            'gender' => 'female',
+            'family_head_id' => $madar->id,
+            'relation_to_family_head' => 'wife',
+            'is_living' => false,
+            'is_private' => false,
+            'created_by' => $superAdmin->id,
+        ]);
+
+        $child = FamilyMember::query()->create([
+            'family_id' => $rootFamily->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Mynuddin',
+            'gender' => 'male',
+            'family_head_id' => $madar->id,
+            'relation_to_family_head' => 'son',
+            'is_living' => true,
+            'is_private' => false,
+            'created_by' => $superAdmin->id,
+        ]);
+
+        FamilyRelationship::query()->create([
+            'family_id' => $rootFamily->id,
+            'from_member_id' => $madar->id,
+            'to_member_id' => $chand->id,
+            'relationship_type' => FamilyRelationship::TYPE_SPOUSE,
+            'created_by' => $superAdmin->id,
+        ]);
+
+        FamilyRelationship::query()->create([
+            'family_id' => $rootFamily->id,
+            'from_member_id' => $madar->id,
+            'to_member_id' => $child->id,
+            'relationship_type' => FamilyRelationship::TYPE_PARENT,
+            'created_by' => $superAdmin->id,
+        ]);
+
+        Sanctum::actingAs($superAdmin);
+
+        $this->getJson("/api/v1/family-members?family_id={$branchFamily->id}")
+            ->assertOk()
+            ->assertJsonFragment(['display_name' => 'Shaik Madar Saheb'])
+            ->assertJsonFragment(['display_name' => 'Shaik Chand Begum'])
+            ->assertJsonFragment(['display_name' => 'Shaik Mynuddin']);
+    }
+
+    public function test_cached_legacy_spouse_form_with_branch_family_stores_member_on_root_tree_household(): void
+    {
+        $rootFamily = Family::query()->create([
+            'name' => 'Shaik Nanne Saheb Family',
+            'slug' => 'shaik-nanne-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $branchFamily = Family::query()->create([
+            'name' => 'Shaik Madar Saheb Family',
+            'slug' => 'shaik-madar-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $superAdmin = User::query()->create([
+            'name' => 'Super Admin',
+            'email' => 'superadmin@example.com',
+            'password' => 'password123',
+            'role' => User::ROLE_SUPER_ADMIN,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+
+        $madar = FamilyMember::query()->create([
+            'family_id' => $rootFamily->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Madar Saheb',
+            'gender' => 'male',
+            'marital_status' => 'married',
+            'is_living' => false,
+            'is_private' => false,
+            'created_by' => $superAdmin->id,
+        ]);
+
+        Sanctum::actingAs($superAdmin);
+
+        $response = $this->postJson('/api/v1/family-members', [
+            'family_id' => $branchFamily->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Chand Begum',
+            'gender' => 'female',
+            'family_head_id' => $madar->id,
+            'relationship_to_family_head' => 'wife',
+            'marital_status' => 'married',
+            'living_status' => 'deceased',
+            'death_date' => '2014-04-01',
+            'is_private' => false,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.member.family_id', $rootFamily->id)
+            ->assertJsonPath('data.member.family_head_id', $madar->id)
+            ->assertJsonPath('data.member.relation_to_family_head', 'wife')
+            ->assertJsonPath('data.household.name', 'Shaik Madar Saheb & Shaik Chand Begum Family')
+            ->assertJsonPath('data.family', null);
+
+        $spouseId = $response->json('data.member.id');
+
+        $this->assertDatabaseHas('family_relationships', [
+            'family_id' => $rootFamily->id,
+            'from_member_id' => $madar->id,
+            'to_member_id' => $spouseId,
+            'relationship_type' => FamilyRelationship::TYPE_SPOUSE,
+        ]);
+
+        $this->assertDatabaseHas('households', [
+            'family_id' => $rootFamily->id,
+            'name' => 'Shaik Madar Saheb & Shaik Chand Begum Family',
+            'primary_person_id' => $madar->id,
+            'spouse_person_id' => $spouseId,
+        ]);
+
+        $this->assertDatabaseMissing('family_members', [
+            'id' => $spouseId,
+            'family_id' => $branchFamily->id,
+        ]);
+    }
+
+    public function test_admin_assigned_legacy_branch_can_list_branch_members_and_add_spouse(): void
+    {
+        $rootFamily = Family::query()->create([
+            'name' => 'Shaik Nanne Saheb Family',
+            'slug' => 'shaik-nanne-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $branchFamily = Family::query()->create([
+            'name' => 'Shaik Madar Saheb Family',
+            'slug' => 'shaik-madar-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $admin = User::query()->create([
+            'name' => 'Branch Admin',
+            'email' => 'branch-admin@example.com',
+            'password' => 'password123',
+            'role' => User::ROLE_ADMIN,
+            'family_id' => $branchFamily->id,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+
+        $madar = FamilyMember::query()->create([
+            'family_id' => $rootFamily->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Madar Saheb',
+            'gender' => 'male',
+            'marital_status' => 'married',
+            'is_living' => false,
+            'is_private' => false,
+            'created_by' => $admin->id,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->getJson("/api/v1/family-members?family_id={$branchFamily->id}")
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => $madar->id,
+                'display_name' => 'Shaik Madar Saheb',
+            ]);
+
+        $response = $this->postJson('/api/v1/family-members', [
+            'family_id' => $branchFamily->id,
+            'add_member_type' => 'spouse',
+            'existing_person_id' => $madar->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Chand Begum',
+            'gender' => 'female',
+            'marital_status' => 'married',
+            'living_status' => 'living',
+            'is_private' => false,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.member.family_id', $rootFamily->id)
+            ->assertJsonPath('data.household.name', 'Shaik Madar Saheb & Shaik Chand Begum Family');
+    }
+
+    public function test_user_assigned_legacy_branch_can_add_child_to_branch_household(): void
+    {
+        $rootFamily = Family::query()->create([
+            'name' => 'Shaik Nanne Saheb Family',
+            'slug' => 'shaik-nanne-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $branchFamily = Family::query()->create([
+            'name' => 'Shaik Madar Saheb Family',
+            'slug' => 'shaik-madar-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $user = User::query()->create([
+            'name' => 'Branch User',
+            'email' => 'branch-user@example.com',
+            'password' => 'password123',
+            'role' => User::ROLE_USER,
+            'family_id' => $branchFamily->id,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+
+        $madar = FamilyMember::query()->create([
+            'family_id' => $rootFamily->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Madar Saheb',
+            'gender' => 'male',
+            'marital_status' => 'married',
+            'is_living' => false,
+            'is_private' => false,
+            'created_by' => $user->id,
+        ]);
+
+        $chand = FamilyMember::query()->create([
+            'family_id' => $rootFamily->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Chand Begum',
+            'gender' => 'female',
+            'marital_status' => 'married',
+            'is_living' => false,
+            'is_private' => false,
+            'created_by' => $user->id,
+        ]);
+
+        $household = Household::query()->create([
+            'family_id' => $rootFamily->id,
+            'name' => 'Shaik Madar Saheb & Shaik Chand Begum Family',
+            'primary_person_id' => $madar->id,
+            'spouse_person_id' => $chand->id,
+            'created_by' => $user->id,
+        ]);
+
+        HouseholdMember::query()->create([
+            'household_id' => $household->id,
+            'member_id' => $madar->id,
+            'role' => Household::ROLE_HUSBAND,
+            'created_by' => $user->id,
+        ]);
+
+        HouseholdMember::query()->create([
+            'household_id' => $household->id,
+            'member_id' => $chand->id,
+            'role' => Household::ROLE_WIFE,
+            'created_by' => $user->id,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->getJson("/api/v1/households?family_id={$branchFamily->id}")
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => $household->id,
+                'name' => 'Shaik Madar Saheb & Shaik Chand Begum Family',
+            ]);
+
+        $response = $this->postJson('/api/v1/family-members', [
+            'family_id' => $branchFamily->id,
+            'add_member_type' => 'child',
+            'household_id' => $household->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Tajuddin',
+            'gender' => 'male',
+            'living_status' => 'living',
+            'is_private' => false,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.member.family_id', $rootFamily->id)
+            ->assertJsonPath('data.member.relation_to_family_head', 'son')
+            ->assertJsonPath('data.household.id', $household->id);
+
+        $childId = $response->json('data.member.id');
+
+        $this->assertDatabaseHas('family_relationships', [
+            'family_id' => $rootFamily->id,
+            'from_member_id' => $madar->id,
+            'to_member_id' => $childId,
+            'relationship_type' => FamilyRelationship::TYPE_PARENT,
+        ]);
+
+        $this->assertDatabaseHas('family_relationships', [
+            'family_id' => $rootFamily->id,
+            'from_member_id' => $chand->id,
+            'to_member_id' => $childId,
+            'relationship_type' => FamilyRelationship::TYPE_PARENT,
+        ]);
+    }
+
+    public function test_admin_can_add_child_to_household_and_link_both_parents(): void
+    {
+        $family = Family::query()->create([
+            'name' => 'Shaik Nanne Saheb Family',
+            'slug' => 'shaik-nanne-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $admin = User::query()->create([
+            'name' => 'Family Admin',
+            'email' => 'admin@example.com',
+            'password' => 'password123',
+            'role' => User::ROLE_ADMIN,
+            'family_id' => $family->id,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+
+        $madar = FamilyMember::query()->create([
+            'family_id' => $family->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Madar Saheb',
+            'gender' => 'male',
+            'marital_status' => 'married',
+            'is_living' => false,
+            'is_private' => false,
+            'created_by' => $admin->id,
+        ]);
+
+        $chand = FamilyMember::query()->create([
+            'family_id' => $family->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Chand Begum',
+            'gender' => 'female',
+            'marital_status' => 'married',
+            'is_living' => false,
+            'is_private' => false,
+            'created_by' => $admin->id,
+        ]);
+
+        $household = Household::query()->create([
+            'family_id' => $family->id,
+            'name' => 'Shaik Madar Saheb & Shaik Chand Begum Family',
+            'primary_person_id' => $madar->id,
+            'spouse_person_id' => $chand->id,
+            'created_by' => $admin->id,
+        ]);
+
+        HouseholdMember::query()->create([
+            'household_id' => $household->id,
+            'member_id' => $madar->id,
+            'role' => Household::ROLE_HUSBAND,
+            'created_by' => $admin->id,
+        ]);
+
+        HouseholdMember::query()->create([
+            'household_id' => $household->id,
+            'member_id' => $chand->id,
+            'role' => Household::ROLE_WIFE,
+            'created_by' => $admin->id,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/v1/family-members', [
+            'family_id' => $family->id,
+            'add_member_type' => 'child',
+            'household_id' => $household->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Mynuddin',
+            'gender' => 'male',
+            'living_status' => 'living',
+            'is_private' => false,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.member.family_head_id', $madar->id)
+            ->assertJsonPath('data.member.relation_to_family_head', 'son')
+            ->assertJsonPath('data.household.id', $household->id);
+
+        $childId = $response->json('data.member.id');
+
+        $this->assertDatabaseHas('family_relationships', [
+            'family_id' => $family->id,
+            'from_member_id' => $madar->id,
+            'to_member_id' => $childId,
+            'relationship_type' => FamilyRelationship::TYPE_PARENT,
+        ]);
+
+        $this->assertDatabaseHas('family_relationships', [
+            'family_id' => $family->id,
+            'from_member_id' => $chand->id,
+            'to_member_id' => $childId,
+            'relationship_type' => FamilyRelationship::TYPE_PARENT,
+        ]);
+
+        $this->assertDatabaseHas('household_members', [
+            'household_id' => $household->id,
+            'member_id' => $childId,
+            'role' => Household::ROLE_CHILD,
         ]);
     }
 
@@ -154,7 +684,7 @@ class FamilyMemberUpdateTest extends TestCase
         ]);
     }
 
-    public function test_updating_member_to_married_creates_family_in_member_name_once(): void
+    public function test_updating_member_to_married_does_not_create_member_name_family(): void
     {
         $family = Family::query()->create([
             'name' => 'Shaik Nanne Saheb Family',
@@ -199,21 +729,14 @@ class FamilyMemberUpdateTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('data.member.marital_status', 'married')
-            ->assertJsonPath('data.family.name', 'Shaik Madar Saheb Family');
-
-        $this->assertDatabaseHas('families', [
-            'name' => 'Shaik Madar Saheb Family',
-            'slug' => 'shaik-madar-saheb-family',
-            'description' => 'Family branch created for married member Shaik Madar Saheb.',
-            'created_by' => $admin->id,
-        ]);
+            ->assertJsonPath('data.family', null);
 
         $this->putJson("/api/v1/family-members/{$member->id}", $payload)
             ->assertOk()
             ->assertJsonPath('data.family', null);
 
         $this->assertSame(
-            1,
+            0,
             Family::query()->where('name', 'Shaik Madar Saheb Family')->count()
         );
     }
