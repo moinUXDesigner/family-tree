@@ -14,7 +14,7 @@ class UserManagementController extends Controller
     public function index(): JsonResponse
     {
         $users = User::query()
-            ->with(['family:id,name', 'familyMember:id,user_id'])
+            ->with(['family:id,name', 'familyMember:id,user_id', 'familyConnectionRequest:id,user_id,status'])
             ->withCount('tokens')
             ->latest()
             ->get()
@@ -65,7 +65,7 @@ class UserManagementController extends Controller
             'status' => true,
             'message' => 'User updated.',
             'data' => [
-                'user' => $this->userPayload($user->refresh()->load(['family:id,name', 'familyMember:id,user_id'])->loadCount('tokens')),
+                'user' => $this->userPayload($user->refresh()->load(['family:id,name', 'familyMember:id,user_id', 'familyConnectionRequest:id,user_id,status'])->loadCount('tokens')),
             ],
         ]);
     }
@@ -139,6 +139,7 @@ class UserManagementController extends Controller
             'approval_status' => $user->approval_status,
             'is_active' => $user->is_active,
             'is_connected' => (bool) $user->familyMember,
+            'connection_request_status' => $user->familyConnectionRequest?->status,
             'active_sessions' => $user->tokens_count ?? 0,
             'created_at' => $user->created_at?->toISOString(),
         ];

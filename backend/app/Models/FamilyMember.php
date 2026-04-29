@@ -61,6 +61,14 @@ class FamilyMember extends Model
     }
 
     /**
+     * @return BelongsTo<FamilyMember, $this>
+     */
+    public function familyHead(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'family_head_id');
+    }
+
+    /**
      * @return HasMany<FamilyRelationship, $this>
      */
     public function relationshipsFrom(): HasMany
@@ -74,6 +82,14 @@ class FamilyMember extends Model
     public function relationshipsTo(): HasMany
     {
         return $this->hasMany(FamilyRelationship::class, 'to_member_id');
+    }
+
+    /**
+     * @return HasMany<FamilyConnectionRequest, $this>
+     */
+    public function anchoredConnectionRequests(): HasMany
+    {
+        return $this->hasMany(FamilyConnectionRequest::class, 'anchor_member_id');
     }
 
     /**

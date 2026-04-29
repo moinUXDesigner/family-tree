@@ -25,7 +25,12 @@ class FamilyMemberController extends Controller
         $familyId = $this->requestedFamilyId($request, $user);
 
         $members = FamilyMember::query()
-            ->with('family:id,name')
+            ->with([
+                'creator:id,name,email',
+                'family:id,name',
+                'familyHead:id,first_name,last_name,marital_status',
+                'user:id,name,email',
+            ])
             ->when($familyId, fn (Builder $query) => $query->where('family_id', $familyId))
             ->when(! $user->hasRole(User::ROLE_SUPER_ADMIN) && ! $familyId, fn (Builder $query) => $query->where('family_id', $user->family_id))
             ->orderBy('first_name')
@@ -73,7 +78,12 @@ class FamilyMemberController extends Controller
                 'status' => true,
                 'message' => 'Family member created.',
                 'data' => [
-                    'member' => $this->memberPayload($member->load('family:id,name')),
+                    'member' => $this->memberPayload($member->load([
+                        'creator:id,name,email',
+                        'family:id,name',
+                        'familyHead:id,first_name,last_name,marital_status',
+                        'user:id,name,email',
+                    ])),
                     'family' => $newFamily ? $this->familyPayload($newFamily) : null,
                 ],
             ], 201);
@@ -108,7 +118,12 @@ class FamilyMemberController extends Controller
             'status' => true,
             'message' => 'Family member updated.',
             'data' => [
-                'member' => $this->memberPayload($familyMember->load('family:id,name')),
+                'member' => $this->memberPayload($familyMember->load([
+                    'creator:id,name,email',
+                    'family:id,name',
+                    'familyHead:id,first_name,last_name,marital_status',
+                    'user:id,name,email',
+                ])),
                 'family' => $newFamily ? $this->familyPayload($newFamily) : null,
             ],
         ]);
@@ -484,10 +499,14 @@ class FamilyMemberController extends Controller
      */
     private function memberPayload(FamilyMember $member): array
     {
+        $displayFamily = $this->displayFamily($member);
+
         return [
             'id' => $member->id,
             'family_id' => $member->family_id,
             'family_name' => $member->family?->name,
+            'display_family_id' => $displayFamily?->id ?? $member->family_id,
+            'display_family_name' => $displayFamily?->name ?? $member->family?->name,
             'user_id' => $member->user_id,
             'first_name' => $member->first_name,
             'last_name' => $member->last_name,
@@ -508,6 +527,40 @@ class FamilyMemberController extends Controller
             'notes' => $member->notes,
             'is_living' => $member->is_living,
             'is_private' => $member->is_private,
+            'created_by' => $member->created_by,
+            'creator_name' => $member->creator?->name,
+            'creator_email' => $member->creator?->email,
+            'linked_user_name' => $member->user?->name,
+            'linked_user_email' => $member->user?->email,
+            'family_head_name' => $member->familyHead
+                ? trim("{$member->familyHead->first_name} {$member->familyHead->last_name}")
+                : null,
         ];
+    }
+
+    private function displayFamily(FamilyMember $member): ?Family
+    {
+        if (
+            ! $member->familyHead
+            || ! in_array($member->relation_to_family_head, ['child', 'son', 'daughter'], true)
+        ) {
+            return null;
+        }
+
+        $headName = trim("{$member->familyHead->first_name} {$member->familyHead->last_name}");
+
+        if ($headName === '') {
+            return null;
+        }
+
+        return Family::query()
+            ->where('slug', $this->uniqueFamilySlugCandidate("{$headName} Family"))
+            ->orWhere('name', "{$headName} Family")
+            ->first();
+    }
+
+    private function uniqueFamilySlugCandidate(string $name): string
+    {
+        return Str::slug($name) ?: 'family';
     }
 }

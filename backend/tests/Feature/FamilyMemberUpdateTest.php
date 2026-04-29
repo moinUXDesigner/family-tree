@@ -217,4 +217,62 @@ class FamilyMemberUpdateTest extends TestCase
             Family::query()->where('name', 'Shaik Madar Saheb Family')->count()
         );
     }
+
+    public function test_child_member_payload_displays_family_head_branch_family(): void
+    {
+        $rootFamily = Family::query()->create([
+            'name' => 'Shaik Nanne Saheb Family',
+            'slug' => 'shaik-nanne-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $branchFamily = Family::query()->create([
+            'name' => 'Shaik Madar Saheb Family',
+            'slug' => 'shaik-madar-saheb-family',
+            'description' => 'Family branch created for married member Shaik Madar Saheb.',
+            'is_active' => true,
+        ]);
+
+        $superAdmin = User::query()->create([
+            'name' => 'Super Admin',
+            'email' => 'superadmin@example.com',
+            'password' => 'password123',
+            'role' => User::ROLE_SUPER_ADMIN,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+
+        $madar = FamilyMember::query()->create([
+            'family_id' => $rootFamily->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Madar Saheb',
+            'marital_status' => 'married',
+            'is_living' => false,
+            'is_private' => false,
+            'created_by' => $superAdmin->id,
+        ]);
+
+        FamilyMember::query()->create([
+            'family_id' => $rootFamily->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Rahimatunnisa',
+            'family_head_id' => $madar->id,
+            'relation_to_family_head' => 'daughter',
+            'marital_status' => 'married',
+            'is_living' => true,
+            'is_private' => false,
+            'created_by' => $superAdmin->id,
+        ]);
+
+        Sanctum::actingAs($superAdmin);
+
+        $this->getJson("/api/v1/family-members?family_id={$rootFamily->id}")
+            ->assertOk()
+            ->assertJsonFragment([
+                'display_family_id' => $branchFamily->id,
+                'display_family_name' => 'Shaik Madar Saheb Family',
+                'family_head_name' => 'Shaik Madar Saheb',
+                'relation_to_family_head' => 'daughter',
+            ]);
+    }
 }

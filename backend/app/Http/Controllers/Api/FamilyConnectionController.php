@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Family;
+use App\Models\FamilyConnectionRequest;
 use App\Models\FamilyMember;
-use App\Models\FamilyRelationship;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,44 +17,17 @@ class FamilyConnectionController extends Controller
     private const ROOT_FIRST_NAME = 'Shaik';
     private const ROOT_LAST_NAME = 'Nanne Saheb';
 
-    /**
-     * @var array<int, string>
-     */
-    private const RELATIONSHIPS = [
-        'grandfather',
-        'grandmother',
-        'father',
-        'mother',
-        'son',
-        'daughter',
-        'child',
-        'grandson',
-        'granddaughter',
-        'grandchild',
-        'great grandson',
-        'great granddaughter',
-        'great grandchild',
-        'husband',
-        'wife',
-        'spouse',
-        'brother',
-        'sister',
-        'sibling',
-        'uncle',
-        'aunt',
-        'nephew',
-        'niece',
-        'cousin',
-        'guardian',
-        'ward',
-        'relative',
-    ];
-
     public function status(Request $request): JsonResponse
     {
         $member = FamilyMember::query()
             ->where('user_id', $request->user()->id)
             ->with('family:id,name')
+            ->first();
+        $family = $this->rootFamily();
+        $rootMember = $this->rootMember($family, $request->user());
+        $connectionRequest = FamilyConnectionRequest::query()
+            ->with(['anchorMember:id,first_name,last_name', 'family:id,name'])
+            ->where('user_id', $request->user()->id)
             ->first();
 
         return response()->json([
@@ -70,8 +43,17 @@ class FamilyConnectionController extends Controller
                     'family_name' => $member->family?->name,
                 ] : null,
                 'root_member_name' => $this->rootMemberName(),
-                'root_couple' => $this->rootCouplePayload($request->user()),
-                'relationships' => self::RELATIONSHIPS,
+                'root_member' => [
+                    'id' => $rootMember->id,
+                    'display_name' => $this->memberName($rootMember),
+                ],
+                'family' => [
+                    'id' => $family->id,
+                    'name' => $family->name,
+                ],
+                'anchor_members' => $this->anchorMembers($family),
+                'relationships' => FamilyConnectionRequest::relationshipOptions(),
+                'connection_request' => $connectionRequest ? $this->requestPayload($connectionRequest) : null,
             ],
         ]);
     }
@@ -79,40 +61,50 @@ class FamilyConnectionController extends Controller
     public function connect(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'connection_type' => ['required', 'string', Rule::in(['root_member', 'family_id'])],
-            'family_id' => ['required_if:connection_type,family_id', 'nullable', 'integer', Rule::exists('families', 'id')],
-            'relationship_to_root' => ['required', 'string', Rule::in(self::RELATIONSHIPS)],
+            'anchor_member_id' => ['required', 'integer', Rule::exists('family_members', 'id')],
+            'relationship_to_anchor' => ['required', 'string', Rule::in(FamilyConnectionRequest::relationshipOptions())],
+            'evidence_notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $user = $request->user();
-        $family = $data['connection_type'] === 'family_id'
-            ? Family::query()->findOrFail((int) $data['family_id'])
-            : $this->rootFamily();
+        abort_if($user->familyMember()->exists(), 422, 'This account is already connected to a family member.');
 
-        $rootMember = $this->rootMember($family, $user);
+        $anchorMember = FamilyMember::query()
+            ->whereKey((int) $data['anchor_member_id'])
+            ->firstOrFail();
+        $family = $anchorMember->family;
+        $nameParts = $this->nameParts($user->name);
 
-        $user->forceFill(['family_id' => $family->id])->save();
+        $connectionRequest = FamilyConnectionRequest::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            [
+                'family_id' => $family->id,
+                'anchor_member_id' => $anchorMember->id,
+                'claimed_member_id' => null,
+                'relationship_to_anchor' => $data['relationship_to_anchor'],
+                'status' => FamilyConnectionRequest::STATUS_PENDING,
+                'claimed_first_name' => $nameParts[0],
+                'claimed_last_name' => $nameParts[1],
+                'claimed_email' => $user->email,
+                'claimed_phone' => $user->phone,
+                'evidence_notes' => $data['evidence_notes'] ?? null,
+                'resolved_by' => null,
+                'resolved_at' => null,
+            ],
+        );
 
-        $member = $this->linkedMember($user, $family, $data['relationship_to_root']);
-        $this->connectMemberToRoot($family, $rootMember, $member, $data['relationship_to_root'], $user);
+        $user->forceFill([
+            'family_id' => $family->id,
+            'approval_status' => User::APPROVAL_PENDING,
+        ])->save();
+
+        $connectionRequest->load(['anchorMember:id,first_name,last_name', 'family:id,name']);
 
         return response()->json([
             'status' => true,
-            'message' => 'Family connection saved.',
+            'message' => 'Family connection request submitted for Super Admin approval.',
             'data' => [
-                'family' => [
-                    'id' => $family->id,
-                    'name' => $family->name,
-                ],
-                'member' => [
-                    'id' => $member->id,
-                    'display_name' => trim("{$member->first_name} {$member->last_name}"),
-                    'family_id' => $member->family_id,
-                ],
-                'root_member' => [
-                    'id' => $rootMember->id,
-                    'display_name' => $this->rootMemberName(),
-                ],
+                'connection_request' => $this->requestPayload($connectionRequest),
                 'approval_status' => $user->approval_status,
             ],
         ]);
@@ -157,127 +149,61 @@ class FamilyConnectionController extends Controller
         );
     }
 
-    private function linkedMember(User $user, Family $family, string $relationship): FamilyMember
-    {
-        $nameParts = preg_split('/\s+/', trim($user->name), 2) ?: [$user->name];
-        $firstName = $nameParts[0] ?: $user->name;
-        $lastName = $nameParts[1] ?? null;
-
-        return FamilyMember::query()->updateOrCreate(
-            ['user_id' => $user->id],
-            [
-                'family_id' => $family->id,
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'email' => $user->email,
-                'notes' => "Connected to {$this->rootMemberName()} as {$relationship}.",
-                'is_living' => true,
-                'is_private' => false,
-                'created_by' => $user->id,
-            ],
-        );
-    }
-
-    private function connectMemberToRoot(
-        Family $family,
-        FamilyMember $rootMember,
-        FamilyMember $member,
-        string $relationship,
-        User $user,
-    ): void {
-        $type = $this->relationshipType($relationship);
-
-        if (! $type || $rootMember->id === $member->id) {
-            return;
-        }
-
-        [$fromMemberId, $toMemberId] = $this->relationshipDirection($rootMember, $member, $relationship);
-
-        FamilyRelationship::query()->updateOrCreate(
-            [
-                'family_id' => $family->id,
-                'from_member_id' => $fromMemberId,
-                'to_member_id' => $toMemberId,
-                'relationship_type' => $type,
-            ],
-            [
-                'notes' => "User selected relationship to root: {$relationship}.",
-                'created_by' => $user->id,
-            ],
-        );
-    }
-
-    /**
-     * @return array{0: int, 1: int}
-     */
-    private function relationshipDirection(FamilyMember $rootMember, FamilyMember $member, string $relationship): array
-    {
-        if (in_array($relationship, ['father', 'mother', 'grandfather', 'grandmother'], true)) {
-            return [$member->id, $rootMember->id];
-        }
-
-        return [$rootMember->id, $member->id];
-    }
-
-    private function relationshipType(string $relationship): ?string
-    {
-        return match ($relationship) {
-            'husband', 'wife', 'spouse' => FamilyRelationship::TYPE_SPOUSE,
-            'brother', 'sister', 'sibling', 'cousin' => FamilyRelationship::TYPE_SIBLING,
-            'guardian' => FamilyRelationship::TYPE_GUARDIAN,
-            'father', 'mother', 'son', 'daughter', 'child',
-            'grandfather', 'grandmother', 'grandson', 'granddaughter', 'grandchild',
-            'great grandson', 'great granddaughter', 'great grandchild' => FamilyRelationship::TYPE_PARENT,
-            default => null,
-        };
-    }
-
     private function rootMemberName(): string
     {
         return self::ROOT_FIRST_NAME.' '.self::ROOT_LAST_NAME;
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<int, array<string, mixed>>
      */
-    private function rootCouplePayload(User $user): array
+    private function anchorMembers(Family $family): array
     {
-        $family = $this->rootFamily();
-        $root = $this->rootMember($family, $user);
-        $spouse = $this->rootSpouse($family, $root);
-
-        return [
-            'root_member' => [
-                'id' => $root->id,
-                'display_name' => trim("{$root->first_name} {$root->last_name}"),
-            ],
-            'wife' => $spouse ? [
-                'id' => $spouse->id,
-                'display_name' => trim("{$spouse->first_name} {$spouse->last_name}"),
-            ] : null,
-        ];
+        return FamilyMember::query()
+            ->where('family_id', $family->id)
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get()
+            ->map(fn (FamilyMember $member) => [
+                'id' => $member->id,
+                'display_name' => $this->memberName($member),
+                'is_living' => $member->is_living,
+            ])
+            ->values()
+            ->all();
     }
 
-    private function rootSpouse(Family $family, FamilyMember $root): ?FamilyMember
+    /**
+     * @return array{0: string, 1: string|null}
+     */
+    private function nameParts(string $name): array
     {
-        $relationship = FamilyRelationship::query()
-            ->where('family_id', $family->id)
-            ->where('relationship_type', FamilyRelationship::TYPE_SPOUSE)
-            ->where(function ($query) use ($root): void {
-                $query
-                    ->where('from_member_id', $root->id)
-                    ->orWhere('to_member_id', $root->id);
-            })
-            ->first();
+        $parts = preg_split('/\s+/', trim($name), 2) ?: [$name];
 
-        if (! $relationship) {
-            return null;
-        }
+        return [$parts[0] ?: $name, $parts[1] ?? null];
+    }
 
-        $spouseId = $relationship->from_member_id === $root->id
-            ? $relationship->to_member_id
-            : $relationship->from_member_id;
+    private function memberName(FamilyMember $member): string
+    {
+        return trim("{$member->first_name} {$member->last_name}");
+    }
 
-        return FamilyMember::query()->find($spouseId);
+    /**
+     * @return array<string, mixed>
+     */
+    private function requestPayload(FamilyConnectionRequest $request): array
+    {
+        return [
+            'id' => $request->id,
+            'family_id' => $request->family_id,
+            'family_name' => $request->family?->name,
+            'anchor_member_id' => $request->anchor_member_id,
+            'anchor_member_name' => $request->anchorMember ? $this->memberName($request->anchorMember) : null,
+            'relationship_to_anchor' => $request->relationship_to_anchor,
+            'relationship_label' => Str::headline($request->relationship_to_anchor),
+            'status' => $request->status,
+            'evidence_notes' => $request->evidence_notes,
+            'created_at' => $request->created_at?->toISOString(),
+        ];
     }
 }

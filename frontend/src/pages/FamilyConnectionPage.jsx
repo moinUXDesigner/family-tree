@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { GitBranch, Hash, Link2, LogOut, Network } from 'lucide-react';
+import { GitBranch, Link2, LogOut, Network, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLES } from '../config/roles.js';
 import { Alert, Badge, Button, Card, Input } from '../app/components';
@@ -8,41 +8,18 @@ import { PwaInstallPrompt } from '../pwa/PwaInstallPrompt.jsx';
 import { familyConnectionApi } from '../services/familyConnectionApi.js';
 
 const fallbackRelationships = [
-  'grandfather',
-  'grandmother',
-  'father',
-  'mother',
-  'son',
-  'daughter',
   'child',
-  'grandson',
-  'granddaughter',
-  'grandchild',
-  'great grandson',
-  'great granddaughter',
-  'great grandchild',
-  'husband',
-  'wife',
   'spouse',
-  'brother',
-  'sister',
+  'parent',
   'sibling',
-  'uncle',
-  'aunt',
-  'nephew',
-  'niece',
-  'cousin',
-  'guardian',
-  'ward',
-  'relative',
 ];
 
 export function FamilyConnectionPage() {
   const { logout, token, user } = useAuth();
   const navigate = useNavigate();
-  const [connectionType, setConnectionType] = useState('root_member');
-  const [familyId, setFamilyId] = useState('');
+  const [anchorMemberId, setAnchorMemberId] = useState('');
   const [relationship, setRelationship] = useState('');
+  const [evidenceNotes, setEvidenceNotes] = useState('');
   const [status, setStatus] = useState(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -53,6 +30,7 @@ export function FamilyConnectionPage() {
     () => status?.relationships ?? fallbackRelationships,
     [status],
   );
+  const anchorMembers = status?.anchor_members ?? [];
 
   useEffect(() => {
     let isMounted = true;
@@ -70,6 +48,7 @@ export function FamilyConnectionPage() {
 
         setStatus(nextStatus);
         setRelationship(nextStatus.relationships?.[0] ?? fallbackRelationships[0]);
+        setAnchorMemberId(String(nextStatus.root_member?.id ?? nextStatus.anchor_members?.[0]?.id ?? ''));
 
         if (
           nextStatus.is_connected &&
@@ -107,9 +86,9 @@ export function FamilyConnectionPage() {
 
     try {
       const result = await familyConnectionApi.connect(token, {
-        connection_type: connectionType,
-        family_id: connectionType === 'family_id' ? Number(familyId) : null,
-        relationship_to_root: relationship,
+        anchor_member_id: Number(anchorMemberId),
+        relationship_to_anchor: relationship,
+        evidence_notes: evidenceNotes || null,
       });
 
       const nextStatus = await familyConnectionApi.status(token);
@@ -148,10 +127,10 @@ export function FamilyConnectionPage() {
         </header>
 
         <Badge variant="primary">Family connection</Badge>
-        <h1>Connect your account to the family tree</h1>
+        <h1>Request access to the Nanne Saheb tree</h1>
         <p>
-          Start from root member {status?.root_member_name ?? 'Shaik Nanne Saheb'}, or enter
-          a Family ID if you were invited to a specific family.
+          Select an existing verified family member and your exact relationship to that person.
+          A Super Admin must approve the claim before family access opens.
         </p>
 
         {error ? <Alert variant="error">{error}</Alert> : null}
@@ -162,6 +141,14 @@ export function FamilyConnectionPage() {
               : status.approval_status === 'rejected'
                 ? `Your request for ${status.member?.family_name} was rejected. Contact the Super Admin for access.`
                 : `Request sent for ${status.member?.family_name}. Super Admin approval is required before dashboard access.`}
+          </Alert>
+        ) : null}
+
+        {!status?.is_connected && status?.connection_request ? (
+          <Alert variant={status.connection_request.status === 'rejected' ? 'error' : 'info'}>
+            {status.connection_request.status === 'rejected'
+              ? `Your claim as ${status.connection_request.relationship_label} of ${status.connection_request.anchor_member_name} was rejected. You can submit a corrected request.`
+              : `Your claim as ${status.connection_request.relationship_label} of ${status.connection_request.anchor_member_name} is waiting for Super Admin approval.`}
           </Alert>
         ) : null}
 
@@ -182,48 +169,38 @@ export function FamilyConnectionPage() {
 
         {!status?.is_connected ? (
           <form className="connect-form" onSubmit={handleSubmit}>
-          <div className="connect-choice-grid" role="radiogroup" aria-label="Connection type">
-            <label className={connectionType === 'root_member' ? 'connect-choice active' : 'connect-choice'}>
-              <input
-                checked={connectionType === 'root_member'}
-                name="connection_type"
-                onChange={() => setConnectionType('root_member')}
-                type="radio"
-                value="root_member"
-              />
+          <div className="connect-choice-grid" aria-label="Connection guide">
+            <div className="connect-choice active">
               <GitBranch aria-hidden="true" />
-              <span>Root member</span>
+              <span>Root family</span>
               <strong>{status?.root_member_name ?? 'Shaik Nanne Saheb'}</strong>
-            </label>
+            </div>
 
-            <label className={connectionType === 'family_id' ? 'connect-choice active' : 'connect-choice'}>
-              <input
-                checked={connectionType === 'family_id'}
-                name="connection_type"
-                onChange={() => setConnectionType('family_id')}
-                type="radio"
-                value="family_id"
-              />
-              <Hash aria-hidden="true" />
-              <span>Family ID</span>
-              <strong>Use an existing family number</strong>
-            </label>
+            <div className="connect-choice active">
+              <ShieldCheck aria-hidden="true" />
+              <span>Approval required</span>
+              <strong>Verified by Super Admin</strong>
+            </div>
           </div>
 
-          {connectionType === 'family_id' ? (
-            <Input
-              label="Family ID"
-              min="1"
-              type="number"
-              value={familyId}
-              onChange={(event) => setFamilyId(event.target.value)}
+          <label className="field-group">
+            Existing family member you connect through
+            <select
+              value={anchorMemberId}
+              onChange={(event) => setAnchorMemberId(event.target.value)}
               required
-              fullWidth
-            />
-          ) : null}
+            >
+              <option value="">Select family member</option>
+              {anchorMembers.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <label className="field-group">
-            Your relationship with root member
+            Your relationship to selected member
             <select
               value={relationship}
               onChange={(event) => setRelationship(event.target.value)}
@@ -237,8 +214,18 @@ export function FamilyConnectionPage() {
             </select>
           </label>
 
+          <label className="field-group">
+            Notes for Super Admin
+            <textarea
+              value={evidenceNotes}
+              onChange={(event) => setEvidenceNotes(event.target.value)}
+              placeholder="Example: I am the son of Abdul Rahman. My father can confirm this request."
+              rows={3}
+            />
+          </label>
+
           <Button
-            disabled={isLoading || isSubmitting || !relationship || (connectionType === 'family_id' && !familyId)}
+            disabled={isLoading || isSubmitting || !anchorMemberId || !relationship}
             fullWidth
             isLoading={isSubmitting}
             type="submit"

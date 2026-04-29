@@ -23,9 +23,11 @@ backend/storage/*.key
 backend/storage/logs/*
 backend/bootstrap/cache/*
 
+# Local database import/export artifacts
+backend/database/migrations/*.sql
+
 # OS / editor
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
-

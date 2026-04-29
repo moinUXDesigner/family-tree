@@ -109,12 +109,18 @@ export function ApprovalsPage() {
                     <Badge variant="neutral">{request.family_name ?? 'No family linked'}</Badge>
                     <Badge variant="primary">
                       {request.relationship_label
-                        ? `Relation: ${request.relationship_label}`
+                        ? `Claim: ${request.relationship_label}`
                         : 'Relation not selected'}
                     </Badge>
                   </div>
                   <p>{request.email}</p>
                   {request.phone ? <p>{request.phone}</p> : null}
+                  {request.anchor_member_name ? (
+                    <small>
+                      Connects through: {request.anchor_member_name}
+                    </small>
+                  ) : null}
+                  {request.evidence_notes ? <p>{request.evidence_notes}</p> : null}
                   <small>Status: {request.approval_status}</small>
                 </div>
                 <div className="member-meta">

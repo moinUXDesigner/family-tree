@@ -66,6 +66,14 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasOne<FamilyConnectionRequest, $this>
+     */
+    public function familyConnectionRequest(): HasOne
+    {
+        return $this->hasOne(FamilyConnectionRequest::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

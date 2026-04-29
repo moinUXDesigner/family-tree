@@ -38,6 +38,7 @@ const treeRoutes = {
 
 const emptyForm = {
   family_id: '',
+  tree_family_id: '',
   first_name: '',
   last_name: '',
   gender: '',
@@ -150,7 +151,7 @@ export function MembersPage({ role }) {
     try {
       const payload = {
         ...form,
-        family_id: Number(selectedFamilyId),
+        family_id: Number(isEditingMember ? form.tree_family_id || editingMember.family_id : selectedFamilyId),
         family_head_id: form.family_head_id ? Number(form.family_head_id) : null,
         is_living: form.living_status === 'living',
         death_date: form.living_status === 'deceased' ? form.death_date : null,
@@ -243,7 +244,8 @@ export function MembersPage({ role }) {
     setIsAddingMember(false);
     setForm({
       ...emptyForm,
-      family_id: String(member.family_id ?? selectedFamilyId),
+      family_id: String(member.display_family_id ?? member.family_id ?? selectedFamilyId),
+      tree_family_id: String(member.family_id ?? selectedFamilyId),
       first_name: member.first_name ?? '',
       last_name: member.last_name ?? '',
       gender: member.gender ?? '',
@@ -334,6 +336,7 @@ export function MembersPage({ role }) {
                   <select
                     value={form.family_id}
                     onChange={(event) => updateForm('family_id', event.target.value)}
+                    disabled={isEditingMember}
                     required
                   >
                     {families.map((family) => (
@@ -536,7 +539,7 @@ export function MembersPage({ role }) {
                 <div className="member-main">
                   <div className="member-title-line">
                     <strong>{member.display_name}</strong>
-                    {member.family_name ? <Badge variant="neutral">{member.family_name}</Badge> : null}
+                    {member.display_family_name ? <Badge variant="neutral">{member.display_family_name}</Badge> : null}
                   </div>
                   <p>
                     {[member.current_city, member.current_country].filter(Boolean).join(', ') ||
@@ -546,6 +549,24 @@ export function MembersPage({ role }) {
                     {[member.email, member.phone].filter(Boolean).join(' | ') ||
                       'No contact details'}
                   </small>
+                  <div className="member-detail-lines">
+                    {member.linked_user_email ? (
+                      <span>
+                        Signed up: {member.linked_user_name || member.linked_user_email}
+                        {member.linked_user_name ? ` (${member.linked_user_email})` : ''}
+                      </span>
+                    ) : (
+                      <span>
+                        Added by: {[member.creator_name, member.creator_email].filter(Boolean).join(' | ') ||
+                          'Not recorded'}
+                      </span>
+                    )}
+                    {member.family_head_name && member.relation_to_family_head ? (
+                      <span>
+                        {relationshipLabel(member.relation_to_family_head)} of {member.family_head_name}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="member-meta">
                   <Badge variant={member.is_living ? 'success' : 'neutral'}>
@@ -604,4 +625,8 @@ function initials(name) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join('');
+}
+
+function relationshipLabel(value) {
+  return relationshipOptions.find(([optionValue]) => optionValue === value)?.[1] ?? value;
 }

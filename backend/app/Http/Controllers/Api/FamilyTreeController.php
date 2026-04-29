@@ -71,10 +71,13 @@ class FamilyTreeController extends Controller
     {
         return [
             'id' => $member->id,
+            'user_id' => $member->user_id,
             'name' => trim("{$member->first_name} {$member->last_name}"),
             'first_name' => $member->first_name,
             'last_name' => $member->last_name,
+            'gender' => $member->gender,
             'birth_date' => $member->birth_date?->format('Y-m-d'),
+            'death_date' => $member->death_date?->format('Y-m-d'),
             'is_living' => $member->is_living,
             'location' => trim(collect([$member->current_city, $member->current_country])->filter()->join(', ')),
         ];
