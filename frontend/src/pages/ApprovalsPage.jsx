@@ -12,6 +12,7 @@ export function ApprovalsPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedMembers, setSelectedMembers] = useState({});
 
   useEffect(() => {
     let isMounted = true;
@@ -25,6 +26,14 @@ export function ApprovalsPage() {
 
         if (isMounted) {
           setRequests(nextRequests);
+          setSelectedMembers(
+            Object.fromEntries(
+              nextRequests.map((request) => [
+                request.id,
+                request.suggested_member_id ? String(request.suggested_member_id) : '',
+              ]),
+            ),
+          );
         }
       } catch (loadError) {
         if (isMounted) {
@@ -49,7 +58,12 @@ export function ApprovalsPage() {
     setSuccess('');
 
     try {
-      await approvalApi.updateRequest(token, request.id, approvalStatus);
+      await approvalApi.updateRequest(
+        token,
+        request.id,
+        approvalStatus,
+        approvalStatus === 'approved' ? selectedMembers[request.id] : null,
+      );
       setRequests((current) => current.filter((item) => item.id !== request.id));
       setSuccess(
         approvalStatus === 'approved'
@@ -121,6 +135,28 @@ export function ApprovalsPage() {
                     </small>
                   ) : null}
                   {request.evidence_notes ? <p>{request.evidence_notes}</p> : null}
+                  {request.claimable_members?.length ? (
+                    <label className="field-group compact-field">
+                      Link existing member
+                      <select
+                        value={selectedMembers[request.id] ?? ''}
+                        onChange={(event) => {
+                          setSelectedMembers((current) => ({
+                            ...current,
+                            [request.id]: event.target.value,
+                          }));
+                        }}
+                      >
+                        <option value="">Create new member if no safe match exists</option>
+                        {request.claimable_members.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.display_name}
+                            {member.match_score ? ` - match ${member.match_score}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
                   <small>Status: {request.approval_status}</small>
                 </div>
                 <div className="member-meta">

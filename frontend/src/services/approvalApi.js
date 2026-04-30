@@ -6,10 +6,13 @@ export const approvalApi = {
     return response.data.users;
   },
 
-  async updateRequest(token, userId, approvalStatus) {
+  async updateRequest(token, userId, approvalStatus, claimedMemberId = null) {
     const response = await apiClient.post(
       `/approval-requests/${userId}`,
-      { approval_status: approvalStatus },
+      {
+        approval_status: approvalStatus,
+        claimed_member_id: claimedMemberId || null,
+      },
       token,
     );
     return response.data.user;

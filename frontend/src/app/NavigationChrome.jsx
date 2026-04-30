@@ -107,11 +107,14 @@ const feedbackInboxRoutes = {
   [ROLES.ADMIN]: '/admin/feedbacks',
 };
 
+const bottomNavHiddenKeys = new Set(['relationships', 'families', 'root-family']);
+
 export function NavigationChrome({ active, mobileBackTo = '', role }) {
   const { logout, user } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const visibleNavItems = navItems.filter((item) => !item.roles || item.roles.includes(role));
+  const bottomNavItems = visibleNavItems.filter((item) => !bottomNavHiddenKeys.has(item.key));
 
   function closeMobileSidebar() {
     setIsMobileSidebarOpen(false);
@@ -226,7 +229,7 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
 
       <Paper className="bottom-nav-shell" elevation={8}>
         <BottomNavigation showLabels value={active}>
-          {visibleNavItems.map((item) => (
+          {bottomNavItems.map((item) => (
             <BottomNavigationAction
               component={Link}
               icon={item.icon}

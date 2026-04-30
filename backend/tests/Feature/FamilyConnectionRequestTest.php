@@ -121,6 +121,89 @@ class FamilyConnectionRequestTest extends TestCase
         ]);
     }
 
+    public function test_super_admin_approval_links_existing_member_instead_of_creating_duplicate(): void
+    {
+        [$family, $anchor] = $this->rootFamilyWithAnchor();
+        $superAdmin = User::query()->create([
+            'name' => 'Super Admin',
+            'email' => 'super@example.com',
+            'phone' => '1111111111',
+            'password' => 'password123',
+            'role' => User::ROLE_SUPER_ADMIN,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+        $existingMember = FamilyMember::query()->create([
+            'family_id' => $family->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Ahmed',
+            'email' => 'ahmed@example.com',
+            'phone' => '9999999999',
+            'family_head_id' => $anchor->id,
+            'relation_to_family_head' => 'son',
+            'is_living' => true,
+            'is_private' => false,
+            'created_by' => $superAdmin->id,
+        ]);
+        FamilyRelationship::query()->create([
+            'family_id' => $family->id,
+            'from_member_id' => $anchor->id,
+            'to_member_id' => $existingMember->id,
+            'relationship_type' => FamilyRelationship::TYPE_PARENT,
+            'created_by' => $superAdmin->id,
+        ]);
+        $user = User::query()->create([
+            'name' => 'Shaik Ahmed',
+            'email' => 'ahmed@example.com',
+            'phone' => '9999999999',
+            'password' => 'password123',
+            'role' => User::ROLE_USER,
+            'family_id' => $family->id,
+            'approval_status' => User::APPROVAL_PENDING,
+            'is_active' => true,
+        ]);
+
+        FamilyConnectionRequest::query()->create([
+            'user_id' => $user->id,
+            'family_id' => $family->id,
+            'anchor_member_id' => $anchor->id,
+            'relationship_to_anchor' => 'son',
+            'status' => FamilyConnectionRequest::STATUS_PENDING,
+            'claimed_first_name' => 'Shaik',
+            'claimed_last_name' => 'Ahmed',
+            'claimed_email' => $user->email,
+            'claimed_phone' => $user->phone,
+        ]);
+
+        Sanctum::actingAs($superAdmin);
+
+        $this->getJson('/api/v1/approval-requests')
+            ->assertOk()
+            ->assertJsonPath('data.users.0.suggested_member_id', $existingMember->id)
+            ->assertJsonPath('data.users.0.claimable_members.0.id', $existingMember->id);
+
+        $response = $this->postJson("/api/v1/approval-requests/{$user->id}", [
+            'approval_status' => User::APPROVAL_APPROVED,
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.user.approval_status', User::APPROVAL_APPROVED)
+            ->assertJsonPath('data.user.member_id', $existingMember->id);
+
+        $this->assertSame(2, FamilyMember::query()->where('family_id', $family->id)->count());
+        $this->assertDatabaseHas('family_members', [
+            'id' => $existingMember->id,
+            'user_id' => $user->id,
+        ]);
+        $this->assertDatabaseHas('family_connection_requests', [
+            'user_id' => $user->id,
+            'claimed_member_id' => $existingMember->id,
+            'status' => FamilyConnectionRequest::STATUS_APPROVED,
+            'resolved_by' => $superAdmin->id,
+        ]);
+    }
+
     /**
      * @return array{0: Family, 1: FamilyMember}
      */
