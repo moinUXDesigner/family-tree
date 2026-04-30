@@ -32,7 +32,15 @@ services:
     depends_on:
       mariadb:
         condition: service_healthy
-    command: sh -c "php artisan serve --host=0.0.0.0 --port=8000"
+    command: >
+      sh -c "
+      [ -f .env ] || cp .env.example .env;
+      [ -f vendor/autoload.php ] || composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader;
+      php artisan key:generate --force;
+      php artisan migrate --force;
+      php artisan db:seed --force;
+      php artisan serve --host=0.0.0.0 --port=8000
+      "
 
   phpmyadmin:
     image: phpmyadmin:5.2

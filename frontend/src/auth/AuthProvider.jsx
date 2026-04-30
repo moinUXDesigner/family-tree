@@ -108,10 +108,11 @@ export function AuthProvider({ children }) {
       login,
       logout,
       register,
+      clearSession,
       token,
       user,
     }),
-    [isCheckingSession, login, logout, register, token, user],
+    [clearSession, isCheckingSession, login, logout, register, token, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

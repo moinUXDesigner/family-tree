@@ -2,15 +2,22 @@ import { apiConfig } from '../config/api.js';
 
 async function request(path, options = {}) {
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
-  const response = await fetch(`${apiConfig.baseUrl}${path}`, {
-    ...options,
-    headers: {
-      Accept: 'application/json',
-      ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
-      ...options.headers,
-    },
-  });
+  let response;
+  try {
+    response = await fetch(`${apiConfig.baseUrl}${path}`, {
+      ...options,
+      headers: {
+        Accept: 'application/json',
+        ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
+        ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+        ...options.headers,
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      'Unable to reach the API server. Make sure backend is running and VITE_API_PROXY_TARGET is correct.',
+    );
+  }
 
   const payload = await response.json().catch(() => ({}));
 
@@ -21,7 +28,7 @@ async function request(path, options = {}) {
       payload.message ??
       payload.errors?.email?.[0] ??
       payload.errors?.password?.[0] ??
-      'Request failed.';
+      `Request failed with status ${response.status}.`;
     throw new Error(message);
   }
 

@@ -2,14 +2,19 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { RegisterPage } from './pages/RegisterPage.jsx';
 import { ApprovalsPage } from './pages/ApprovalsPage.jsx';
+import { ChangePasswordPage } from './pages/ChangePasswordPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { FamiliesPage } from './pages/FamiliesPage.jsx';
 import { FamilyConnectionPage } from './pages/FamilyConnectionPage.jsx';
 import { FeedbackInboxPage } from './pages/FeedbackInboxPage.jsx';
 import { FeedbackPage } from './pages/FeedbackPage.jsx';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage.jsx';
 import { MembersPage } from './pages/MembersPage.jsx';
+import { PasswordChangedPage } from './pages/PasswordChangedPage.jsx';
+import { ProfilePage } from './pages/ProfilePage.jsx';
 import { RelationshipsPage } from './pages/RelationshipsPage.jsx';
 import { RootFamilyPage } from './pages/RootFamilyPage.jsx';
+import { ResetPasswordPage } from './pages/ResetPasswordPage.jsx';
 import { TreePage } from './pages/TreePage.jsx';
 import { UsersPage } from './pages/UsersPage.jsx';
 import { RequireAuth } from './auth/RequireAuth.jsx';
@@ -39,8 +44,14 @@ export function App() {
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/password-changed" element={<PasswordChangedPage />} />
 
       <Route element={<RequireAuth />}>
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/change-password" element={<ChangePasswordPage />} />
+
         <Route element={<RequireRole roles={[ROLES.SUPER_ADMIN]} />}>
           <Route
             path="/super-admin/dashboard"

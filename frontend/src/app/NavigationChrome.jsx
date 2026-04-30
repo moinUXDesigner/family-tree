@@ -10,6 +10,7 @@ import {
   Logout as LogoutIcon,
   ManageAccounts,
   Menu,
+  Person,
   PeopleAlt,
   RateReview,
   RecentActors,
@@ -210,6 +211,10 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
         </nav>
 
         <div className="sidebar-footer">
+          <Link className={active === 'profile' ? 'nav-feedback-button active' : 'nav-feedback-button'} onClick={closeMobileSidebar} to="/profile">
+            <Person aria-hidden="true" />
+            <span>Profile</span>
+          </Link>
           {feedbackInboxRoutes[role] ? (
             <Link className="nav-feedback-button" onClick={closeMobileSidebar} to={feedbackInboxRoutes[role]}>
               <RateReview aria-hidden="true" />

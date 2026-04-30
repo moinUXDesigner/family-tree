@@ -79,6 +79,10 @@ export function LoginPage() {
             fullWidth
           />
 
+          <div className="auth-inline-link">
+            <Link to="/forgot-password">Forgot password?</Link>
+          </div>
+
           {error ? <Alert variant="error">{error}</Alert> : null}
 
           <Button disabled={isSubmitting} fullWidth isLoading={isSubmitting} type="submit">

@@ -257,6 +257,118 @@ p {
   text-align: center;
 }
 
+.auth-inline-link {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -4px;
+}
+
+.auth-inline-link a {
+  font-size: 0.9rem;
+}
+
+.profile-content {
+  width: min(100%, 760px);
+}
+
+.profile-card {
+  border: 1px solid #dce2ea !important;
+  border-radius: 16px !important;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.profile-avatar {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border-radius: 50%;
+  background: #e3f2fd;
+  color: #0b57d0;
+}
+
+.profile-header h2 {
+  margin: 0;
+}
+
+.profile-header p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.profile-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.profile-fields div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.profile-fields dt {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.profile-fields dd {
+  margin: 0;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.profile-actions {
+  margin-top: 20px;
+}
+
+.password-success-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  background: radial-gradient(circle at top, #dbeafe 0%, #f8fafc 45%, #f5f5f5 100%);
+  padding: 24px;
+}
+
+.password-success-card {
+  width: min(100%, 520px);
+  text-align: center;
+  border: 1px solid #bfdbfe !important;
+  border-radius: 20px !important;
+}
+
+.password-success-icon {
+  display: grid;
+  width: 82px;
+  height: 82px;
+  place-items: center;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #15803d;
+  margin: 8px auto 18px;
+}
+
+.password-success-card h1 {
+  margin: 0;
+}
+
+.password-success-card p {
+  margin: 14px 0 24px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
 .dashboard-page {
   display: grid;
   min-height: 100vh;
