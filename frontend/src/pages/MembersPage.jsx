@@ -61,8 +61,9 @@ const emptyForm = {
 const addMemberTypeOptions = [
   ['spouse', 'Add Spouse', false],
   ['child', 'Add Child', false],
-  ['parent', 'Add Parent', true],
-  ['existing_to_household', 'Add Existing Person to Household', true],
+  ['parent', 'Add Parent', false],
+  ['sibling', 'Add Sibling', false],
+  ['existing_to_household', 'Add Existing Person to Household', false],
 ];
 
 const relationshipOptions = [
@@ -102,7 +103,7 @@ export function MembersPage({ role }) {
   const selectedFamilyId = form.family_id || directoryFamilyId || families[0]?.id || user.family_id || '';
   const canSubmitMemberForm = isEditingMember
     ? Boolean(selectedFamilyId && form.first_name)
-    : Boolean(selectedFamilyId && form.first_name && canSubmitAddMemberType(form.add_member_type));
+    : canSubmitAddMemberForm(selectedFamilyId, form);
 
   const stats = useMemo(() => {
     const livingCount = members.filter((member) => member.is_living).length;
@@ -172,8 +173,10 @@ export function MembersPage({ role }) {
         ...form,
         family_id: Number(isEditingMember ? form.tree_family_id || editingMember.family_id : selectedFamilyId),
         add_member_type: addMemberType,
-        existing_person_id: addMemberType === 'spouse' && form.existing_person_id ? Number(form.existing_person_id) : null,
-        household_id: addMemberType === 'child' && form.household_id ? Number(form.household_id) : null,
+        existing_person_id: needsExistingPerson(addMemberType) && form.existing_person_id
+          ? Number(form.existing_person_id)
+          : null,
+        household_id: needsHousehold(addMemberType) && form.household_id ? Number(form.household_id) : null,
         family_head_id: isEditingMember && form.family_head_id ? Number(form.family_head_id) : null,
         relationship_to_family_head: isEditingMember ? form.relationship_to_family_head : null,
         is_living: form.living_status === 'living',
@@ -276,7 +279,9 @@ export function MembersPage({ role }) {
       add_member_type: value,
       existing_person_id: '',
       household_id: '',
-      marital_status: value === 'child' ? 'unmarried' : 'married',
+      first_name: value === 'existing_to_household' ? '' : current.first_name,
+      last_name: value === 'existing_to_household' ? '' : current.last_name,
+      marital_status: ['child', 'sibling'].includes(value) ? 'unmarried' : 'married',
     }));
   }
 
@@ -379,7 +384,7 @@ export function MembersPage({ role }) {
                 <p>
                   {isEditingMember
                     ? 'Update the existing member profile.'
-                    : 'Create a spouse or child record and attach it to the right household.'}
+                    : 'Create relatives or attach an existing person to the right household.'}
                 </p>
               </div>
               <Button onClick={hideAddMemberForm} type="button" variant="outline">
@@ -423,7 +428,7 @@ export function MembersPage({ role }) {
                     </select>
                   </label>
 
-                  {form.add_member_type === 'spouse' ? (
+                  {needsExistingPerson(form.add_member_type) ? (
                     <label className="field-group member-form-wide">
                       Existing person
                       <select
@@ -439,13 +444,13 @@ export function MembersPage({ role }) {
                         ))}
                       </select>
                       <small>
-                        Select the person this new spouse should be linked to.
+                        {existingPersonHelpText(form.add_member_type)}
                         {members.length === 0 ? ' No members are loaded for this family yet.' : ''}
                       </small>
                     </label>
                   ) : null}
 
-                  {form.add_member_type === 'child' ? (
+                  {needsHousehold(form.add_member_type) ? (
                     <label className="field-group member-form-wide">
                       Household / Couple Family
                       <select
@@ -461,7 +466,9 @@ export function MembersPage({ role }) {
                         ))}
                       </select>
                       <small>
-                        Select the couple household this child belongs to.
+                        {form.add_member_type === 'existing_to_household'
+                          ? 'Select the household this existing person should be attached to.'
+                          : 'Select the couple household this child belongs to.'}
                         {households.length === 0 ? ' Add a spouse first to create a household.' : ''}
                       </small>
                     </label>
@@ -469,121 +476,129 @@ export function MembersPage({ role }) {
                 </>
               ) : null}
 
-              <Input
-                label="First name"
-                leftIcon={<UserRound aria-hidden="true" size={18} />}
-                value={form.first_name}
-                onChange={(event) => updateForm('first_name', event.target.value)}
-                required
-                fullWidth
-              />
-              <Input
-                label="Last name"
-                value={form.last_name}
-                onChange={(event) => updateForm('last_name', event.target.value)}
-                fullWidth
-              />
-              <Input
-                label="Birth date"
-                leftIcon={<CalendarDays aria-hidden="true" size={18} />}
-                type="date"
-                value={form.birth_date}
-                onChange={(event) => updateForm('birth_date', event.target.value)}
-                fullWidth
-              />
-              <label className="field-group">
-                Gender
-                <select value={form.gender} onChange={(event) => updateForm('gender', event.target.value)}>
-                  <option value="">Select gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="non_binary">Non-binary</option>
-                  <option value="prefer_not_to_say">Prefer not to say</option>
-                </select>
-              </label>
-              <Input
-                label="Email"
-                leftIcon={<Mail aria-hidden="true" size={18} />}
-                type="email"
-                value={form.email}
-                onChange={(event) => updateForm('email', event.target.value)}
-                fullWidth
-              />
-              <Input
-                label="Phone"
-                leftIcon={<Phone aria-hidden="true" size={18} />}
-                value={form.phone}
-                onChange={(event) => updateForm('phone', event.target.value)}
-                fullWidth
-              />
-              <Input
-                label="City"
-                leftIcon={<MapPin aria-hidden="true" size={18} />}
-                value={form.current_city}
-                onChange={(event) => updateForm('current_city', event.target.value)}
-                fullWidth
-              />
-              <Input
-                label="Country"
-                leftIcon={<Globe2 aria-hidden="true" size={18} />}
-                value={form.current_country}
-                onChange={(event) => updateForm('current_country', event.target.value)}
-                fullWidth
-              />
-
-              <label className="field-group member-form-wide">
-                Married / Unmarried
-                <select
-                  value={form.marital_status}
-                  onChange={(event) => updateForm('marital_status', event.target.value)}
-                  required
-                >
-                  <option value="unmarried">Unmarried</option>
-                  <option value="married">Married</option>
-                </select>
-              </label>
-
-              <label className="field-group member-form-wide">
-                Living Status
-                <select
-                  value={form.living_status}
-                  onChange={(event) => {
-                    if (event.target.value === 'living') {
-                      setForm((current) => ({
-                        ...current,
-                        living_status: 'living',
-                        death_date: '',
-                        graveyard_location: '',
-                      }));
-                      return;
-                    }
-
-                    updateForm('living_status', event.target.value);
-                  }}
-                  required
-                >
-                  <option value="living">Living</option>
-                  <option value="deceased">Deceased</option>
-                </select>
-              </label>
-
-              {form.living_status === 'deceased' ? (
+              {form.add_member_type !== 'existing_to_household' || isEditingMember ? (
                 <>
                   <Input
-                    label="Date of Expiry"
-                    leftIcon={<CalendarDays aria-hidden="true" size={18} />}
-                    type="date"
-                    value={form.death_date}
-                    onChange={(event) => updateForm('death_date', event.target.value)}
+                    label="First name"
+                    leftIcon={<UserRound aria-hidden="true" size={18} />}
+                    value={form.first_name}
+                    onChange={(event) => updateForm('first_name', event.target.value)}
+                    required
                     fullWidth
                   />
                   <Input
-                    label="Graveyard Location"
-                    leftIcon={<MapPin aria-hidden="true" size={18} />}
-                    value={form.graveyard_location}
-                    onChange={(event) => updateForm('graveyard_location', event.target.value)}
+                    label="Last name"
+                    value={form.last_name}
+                    onChange={(event) => updateForm('last_name', event.target.value)}
                     fullWidth
                   />
+                  <Input
+                    label="Birth date"
+                    leftIcon={<CalendarDays aria-hidden="true" size={18} />}
+                    type="date"
+                    value={form.birth_date}
+                    onChange={(event) => updateForm('birth_date', event.target.value)}
+                    fullWidth
+                  />
+                  <label className="field-group">
+                    Gender
+                    <select value={form.gender} onChange={(event) => updateForm('gender', event.target.value)}>
+                      <option value="">Select gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="non_binary">Non-binary</option>
+                      <option value="prefer_not_to_say">Prefer not to say</option>
+                    </select>
+                  </label>
+                  <Input
+                    label="Email"
+                    leftIcon={<Mail aria-hidden="true" size={18} />}
+                    type="email"
+                    value={form.email}
+                    onChange={(event) => updateForm('email', event.target.value)}
+                    fullWidth
+                  />
+                  <Input
+                    label="Phone"
+                    leftIcon={<Phone aria-hidden="true" size={18} />}
+                    value={form.phone}
+                    onChange={(event) => updateForm('phone', event.target.value)}
+                    fullWidth
+                  />
+                  <Input
+                    label="City"
+                    leftIcon={<MapPin aria-hidden="true" size={18} />}
+                    value={form.current_city}
+                    onChange={(event) => updateForm('current_city', event.target.value)}
+                    fullWidth
+                  />
+                  <Input
+                    label="Country"
+                    leftIcon={<Globe2 aria-hidden="true" size={18} />}
+                    value={form.current_country}
+                    onChange={(event) => updateForm('current_country', event.target.value)}
+                    fullWidth
+                  />
+                </>
+              ) : null}
+
+              {form.add_member_type !== 'existing_to_household' || isEditingMember ? (
+                <>
+                  <label className="field-group member-form-wide">
+                    Married / Unmarried
+                    <select
+                      value={form.marital_status}
+                      onChange={(event) => updateForm('marital_status', event.target.value)}
+                      required
+                    >
+                      <option value="unmarried">Unmarried</option>
+                      <option value="married">Married</option>
+                    </select>
+                  </label>
+
+                  <label className="field-group member-form-wide">
+                    Living Status
+                    <select
+                      value={form.living_status}
+                      onChange={(event) => {
+                        if (event.target.value === 'living') {
+                          setForm((current) => ({
+                            ...current,
+                            living_status: 'living',
+                            death_date: '',
+                            graveyard_location: '',
+                          }));
+                          return;
+                        }
+
+                        updateForm('living_status', event.target.value);
+                      }}
+                      required
+                    >
+                      <option value="living">Living</option>
+                      <option value="deceased">Deceased</option>
+                    </select>
+                  </label>
+
+                  {form.living_status === 'deceased' ? (
+                    <>
+                      <Input
+                        label="Date of Expiry"
+                        leftIcon={<CalendarDays aria-hidden="true" size={18} />}
+                        type="date"
+                        value={form.death_date}
+                        onChange={(event) => updateForm('death_date', event.target.value)}
+                        fullWidth
+                      />
+                      <Input
+                        label="Graveyard Location"
+                        leftIcon={<MapPin aria-hidden="true" size={18} />}
+                        value={form.graveyard_location}
+                        onChange={(event) => updateForm('graveyard_location', event.target.value)}
+                        fullWidth
+                      />
+                    </>
+                  ) : null}
                 </>
               ) : null}
 
@@ -702,8 +717,45 @@ function sortMembers(first, second) {
   return first.display_name.localeCompare(second.display_name);
 }
 
+function canSubmitAddMemberForm(selectedFamilyId, form) {
+  if (!selectedFamilyId || !canSubmitAddMemberType(form.add_member_type)) {
+    return false;
+  }
+
+  if (form.add_member_type === 'existing_to_household') {
+    return Boolean(form.existing_person_id && form.household_id);
+  }
+
+  if (needsExistingPerson(form.add_member_type) && !form.existing_person_id) {
+    return false;
+  }
+
+  if (needsHousehold(form.add_member_type) && !form.household_id) {
+    return false;
+  }
+
+  return Boolean(form.first_name);
+}
+
 function canSubmitAddMemberType(addMemberType) {
-  return ['spouse', 'child'].includes(addMemberType);
+  return ['spouse', 'child', 'parent', 'sibling', 'existing_to_household'].includes(addMemberType);
+}
+
+function needsExistingPerson(addMemberType) {
+  return ['spouse', 'parent', 'sibling', 'existing_to_household'].includes(addMemberType);
+}
+
+function needsHousehold(addMemberType) {
+  return ['child', 'existing_to_household'].includes(addMemberType);
+}
+
+function existingPersonHelpText(addMemberType) {
+  return {
+    spouse: 'Select the person this new spouse should be linked to.',
+    parent: 'Select the existing child this new parent should be linked to.',
+    sibling: 'Select the existing person this new sibling should be linked to.',
+    existing_to_household: 'Select the existing person to add to the household.',
+  }[addMemberType] ?? 'Select the related existing person.';
 }
 
 function createMemberSuccessMessage(result) {

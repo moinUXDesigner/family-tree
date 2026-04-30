@@ -63,16 +63,13 @@ class FamilyMemberController extends Controller
             $family = $this->accessibleFamily($request, (int) $data['family_id'], false);
             $addMemberType = $data['add_member_type'] ?? null;
 
-            if (in_array($addMemberType, ['parent', 'existing_to_household'], true)) {
-                throw ValidationException::withMessages([
-                    'add_member_type' => ['This add member type is not available yet.'],
-                ]);
-            }
-
             [$member, $household] = DB::transaction(function () use ($request, $data, $family, $addMemberType): array {
                 return match ($addMemberType) {
                     'spouse' => $this->createSpouseMember($family, $data, $request->user()),
                     'child' => $this->createChildMember($family, $data, $request->user()),
+                    'parent' => $this->createParentMember($family, $data, $request->user()),
+                    'sibling' => $this->createSiblingMember($family, $data, $request->user()),
+                    'existing_to_household' => $this->attachExistingMemberToHousehold($family, $data, $request->user()),
                     default => $this->createLegacyMember($family, $data, $request->user()),
                 };
             });
@@ -183,8 +180,8 @@ class FamilyMemberController extends Controller
         return $request->validate([
             'family_id' => ['required', 'integer', Rule::exists('families', 'id')],
             'user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
-            'add_member_type' => ['sometimes', 'nullable', 'string', Rule::in(['spouse', 'child', 'parent', 'existing_to_household'])],
-            'first_name' => ['required', 'string', 'max:255'],
+            'add_member_type' => ['sometimes', 'nullable', 'string', Rule::in(['spouse', 'child', 'parent', 'sibling', 'existing_to_household'])],
+            'first_name' => ['required_unless:add_member_type,existing_to_household', 'nullable', 'string', 'max:255'],
             'last_name' => ['nullable', 'string', 'max:255'],
             'gender' => ['nullable', 'string', 'max:32'],
             'birth_date' => ['nullable', 'date'],
@@ -557,11 +554,13 @@ class FamilyMemberController extends Controller
         $familyHead = $this->familyHead($family, $data);
         $relationship = $data['relationship_to_family_head'] ?? $data['relation_to_family_head'] ?? null;
 
-        $member = FamilyMember::query()->create([
-            ...$this->memberFields($data),
-            'family_id' => $family->id,
-            'created_by' => $user->id,
-        ]);
+        $member = $this->createOrReuseMember(
+            $family,
+            $data,
+            $user,
+            $relationship,
+            $familyHead ? [$familyHead->id] : [],
+        );
 
         $this->connectToFamilyHead(
             $family,
@@ -600,18 +599,12 @@ class FamilyMemberController extends Controller
             ->where('family_id', $family->id)
             ->findOrFail((int) $data['existing_person_id']);
 
-        $member = FamilyMember::query()->create([
-            ...$this->memberFields([
-                ...$data,
-                'family_head_id' => $existingPerson->id,
-                'relation_to_family_head' => 'spouse',
-                'marital_status' => $data['marital_status'] ?? 'married',
-            ]),
-            'family_id' => $family->id,
-            'created_by' => $user->id,
-        ]);
-
-        $this->ensureSpouseRelationshipDoesNotExist($family, $existingPerson, $member);
+        $member = $this->createOrReuseMember($family, [
+            ...$data,
+            'family_head_id' => $existingPerson->id,
+            'relation_to_family_head' => 'spouse',
+            'marital_status' => $data['marital_status'] ?? 'married',
+        ], $user, 'spouse', [$existingPerson->id]);
 
         $this->createFamilyRelationship(
             $family,
@@ -657,16 +650,12 @@ class FamilyMemberController extends Controller
 
         $familyHeadId = $parentIds->first();
 
-        $member = FamilyMember::query()->create([
-            ...$this->memberFields([
-                ...$data,
-                'family_head_id' => $familyHeadId,
-                'relation_to_family_head' => $this->childRelationFor($data['gender'] ?? null),
-                'marital_status' => $data['marital_status'] ?? 'unmarried',
-            ]),
-            'family_id' => $family->id,
-            'created_by' => $user->id,
-        ]);
+        $member = $this->createOrReuseMember($family, [
+            ...$data,
+            'family_head_id' => $familyHeadId,
+            'relation_to_family_head' => $this->childRelationFor($data['gender'] ?? null),
+            'marital_status' => $data['marital_status'] ?? 'unmarried',
+        ], $user, $this->childRelationFor($data['gender'] ?? null), $parentIds->all());
 
         foreach ($parentIds as $parentId) {
             $this->createFamilyRelationship(
@@ -680,6 +669,234 @@ class FamilyMemberController extends Controller
         }
 
         $this->attachHouseholdMember($household, $member, Household::ROLE_CHILD, $user);
+
+        return [$member, $household->refresh()->load(['primaryPerson', 'spousePerson'])];
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<int, int> $excludeMemberIds
+     */
+    private function createOrReuseMember(
+        Family $family,
+        array $data,
+        User $user,
+        ?string $relationship = null,
+        array $excludeMemberIds = [],
+    ): FamilyMember {
+        $duplicate = $this->matchingExistingMember($family, $data, $relationship, $excludeMemberIds);
+
+        if ($duplicate) {
+            $duplicate->forceFill([
+                ...$this->emptyProfileFields($duplicate, $data),
+                'family_head_id' => $duplicate->family_head_id ?: ($data['family_head_id'] ?? null),
+                'relation_to_family_head' => $duplicate->relation_to_family_head ?: ($data['relation_to_family_head'] ?? $relationship),
+                'marital_status' => $duplicate->marital_status ?: ($data['marital_status'] ?? null),
+            ])->save();
+
+            return $duplicate;
+        }
+
+        return FamilyMember::query()->create([
+            ...$this->memberFields($data),
+            'family_id' => $family->id,
+            'created_by' => $user->id,
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<int, int> $excludeMemberIds
+     */
+    private function matchingExistingMember(
+        Family $family,
+        array $data,
+        ?string $relationship,
+        array $excludeMemberIds,
+    ): ?FamilyMember {
+        $firstName = $this->normalizedText($data['first_name'] ?? null);
+        $lastName = $this->normalizedText($data['last_name'] ?? null);
+
+        if ($firstName === '') {
+            return null;
+        }
+
+        $query = FamilyMember::query()
+            ->where('family_id', $family->id)
+            ->when($excludeMemberIds !== [], fn (Builder $query) => $query->whereNotIn('id', $excludeMemberIds))
+            ->whereRaw('LOWER(TRIM(first_name)) = ?', [$firstName])
+            ->whereRaw("LOWER(TRIM(COALESCE(last_name, ''))) = ?", [$lastName]);
+
+        $email = Str::lower((string) ($data['email'] ?? ''));
+        $phone = $this->normalizedPhone($data['phone'] ?? null);
+        $birthDate = $data['birth_date'] ?? null;
+
+        if ($email !== '' || $birthDate) {
+            $query->where(function (Builder $query) use ($email, $birthDate): void {
+                if ($email !== '') {
+                    $query->orWhereRaw('LOWER(email) = ?', [$email]);
+                }
+
+                if ($birthDate) {
+                    $query->orWhereDate('birth_date', $birthDate);
+                }
+            });
+        }
+
+        $matches = $query->get();
+
+        if ($matches->isEmpty() && $phone !== '') {
+            $matches = FamilyMember::query()
+                ->where('family_id', $family->id)
+                ->when($excludeMemberIds !== [], fn (Builder $query) => $query->whereNotIn('id', $excludeMemberIds))
+                ->whereRaw('LOWER(TRIM(first_name)) = ?', [$firstName])
+                ->whereRaw("LOWER(TRIM(COALESCE(last_name, ''))) = ?", [$lastName])
+                ->get()
+                ->filter(fn (FamilyMember $member): bool => $this->normalizedPhone($member->phone) === $phone)
+                ->values();
+        }
+
+        if ($matches->isEmpty()) {
+            return null;
+        }
+
+        if ($relationship) {
+            $relationshipMatch = $matches->first(
+                fn (FamilyMember $member): bool => $this->relationshipType((string) $member->relation_to_family_head)
+                    === $this->relationshipType($relationship)
+            );
+
+            if ($relationshipMatch) {
+                return $relationshipMatch;
+            }
+        }
+
+        return $matches->first();
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function emptyProfileFields(FamilyMember $member, array $data): array
+    {
+        return collect([
+            'gender',
+            'birth_date',
+            'death_date',
+            'graveyard_location',
+            'email',
+            'phone',
+            'current_city',
+            'current_country',
+            'notes',
+            'is_living',
+            'is_private',
+        ])
+            ->filter(fn (string $field): bool => blank($member->{$field}) && array_key_exists($field, $data))
+            ->mapWithKeys(fn (string $field): array => [$field => $data[$field]])
+            ->all();
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array{0: FamilyMember, 1: Household|null}
+     */
+    private function createParentMember(Family $family, array $data, User $user): array
+    {
+        if (empty($data['existing_person_id'])) {
+            throw ValidationException::withMessages([
+                'existing_person_id' => ['Please select the existing child this parent should be linked to.'],
+            ]);
+        }
+
+        $child = FamilyMember::query()
+            ->where('family_id', $family->id)
+            ->findOrFail((int) $data['existing_person_id']);
+        $relationship = $this->parentRelationFor($data['gender'] ?? null);
+        $member = $this->createOrReuseMember($family, [
+            ...$data,
+            'family_head_id' => $child->id,
+            'relation_to_family_head' => $relationship,
+            'marital_status' => $data['marital_status'] ?? 'married',
+        ], $user, $relationship, [$child->id]);
+
+        $this->createFamilyRelationship(
+            $family,
+            $member->id,
+            $child->id,
+            FamilyRelationship::TYPE_PARENT,
+            "Added as parent to {$this->memberName($child)}.",
+            $user
+        );
+
+        return [$member, null];
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array{0: FamilyMember, 1: Household|null}
+     */
+    private function createSiblingMember(Family $family, array $data, User $user): array
+    {
+        if (empty($data['existing_person_id'])) {
+            throw ValidationException::withMessages([
+                'existing_person_id' => ['Please select the existing person this sibling should be linked to.'],
+            ]);
+        }
+
+        $sibling = FamilyMember::query()
+            ->where('family_id', $family->id)
+            ->findOrFail((int) $data['existing_person_id']);
+        $relationship = $this->siblingRelationFor($data['gender'] ?? null);
+        $member = $this->createOrReuseMember($family, [
+            ...$data,
+            'family_head_id' => $sibling->family_head_id ?: $sibling->id,
+            'relation_to_family_head' => $relationship,
+            'marital_status' => $data['marital_status'] ?? 'unmarried',
+        ], $user, $relationship, [$sibling->id]);
+
+        $this->createFamilyRelationship(
+            $family,
+            $sibling->id,
+            $member->id,
+            FamilyRelationship::TYPE_SIBLING,
+            "Added as sibling to {$this->memberName($sibling)}.",
+            $user
+        );
+
+        if ($sibling->family_head_id) {
+            $this->createFamilyRelationship(
+                $family,
+                $sibling->family_head_id,
+                $member->id,
+                FamilyRelationship::TYPE_PARENT,
+                "Added as sibling in {$this->memberName($sibling)} family.",
+                $user
+            );
+        }
+
+        return [$member, null];
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array{0: FamilyMember, 1: Household}
+     */
+    private function attachExistingMemberToHousehold(Family $family, array $data, User $user): array
+    {
+        if (empty($data['existing_person_id']) || empty($data['household_id'])) {
+            throw ValidationException::withMessages([
+                'existing_person_id' => ['Please select an existing person and household.'],
+            ]);
+        }
+
+        $member = FamilyMember::query()
+            ->where('family_id', $family->id)
+            ->findOrFail((int) $data['existing_person_id']);
+        $household = $this->householdForFamily($family, (int) $data['household_id']);
+
+        $this->attachHouseholdMember($household, $member, $this->householdRoleFor($household, $member), $user);
 
         return [$member, $household->refresh()->load(['primaryPerson', 'spousePerson'])];
     }
@@ -860,6 +1077,24 @@ class FamilyMemberController extends Controller
         };
     }
 
+    private function parentRelationFor(?string $gender): string
+    {
+        return match ($gender) {
+            'male' => 'father',
+            'female' => 'mother',
+            default => 'parent',
+        };
+    }
+
+    private function siblingRelationFor(?string $gender): string
+    {
+        return match ($gender) {
+            'male' => 'brother',
+            'female' => 'sister',
+            default => 'sibling',
+        };
+    }
+
     private function spouseRoleFor(FamilyMember $member): string
     {
         return match ($member->gender) {
@@ -867,6 +1102,37 @@ class FamilyMemberController extends Controller
             'female' => Household::ROLE_WIFE,
             default => Household::ROLE_SPOUSE,
         };
+    }
+
+    private function householdRoleFor(Household $household, FamilyMember $member): string
+    {
+        if ((int) $household->primary_person_id === (int) $member->id) {
+            return $this->spouseRoleFor($member);
+        }
+
+        if ((int) $household->spouse_person_id === (int) $member->id) {
+            return $this->spouseRoleFor($member);
+        }
+
+        if ($member->family_head_id && in_array($member->relation_to_family_head, ['child', 'son', 'daughter'], true)) {
+            return Household::ROLE_CHILD;
+        }
+
+        if (in_array($member->relation_to_family_head, ['father', 'mother', 'parent', 'guardian'], true)) {
+            return Household::ROLE_GUARDIAN;
+        }
+
+        return Household::ROLE_OTHER;
+    }
+
+    private function normalizedText(?string $value): string
+    {
+        return Str::of((string) $value)->lower()->squish()->toString();
+    }
+
+    private function normalizedPhone(?string $value): string
+    {
+        return preg_replace('/\D+/', '', (string) $value) ?? '';
     }
 
     /**
@@ -877,6 +1143,7 @@ class FamilyMemberController extends Controller
         return [
             'father',
             'mother',
+            'parent',
             'son',
             'daughter',
             'child',
@@ -894,7 +1161,7 @@ class FamilyMemberController extends Controller
     private function relationshipType(string $relationship): ?string
     {
         return match ($relationship) {
-            'father', 'mother', 'son', 'daughter', 'child' => FamilyRelationship::TYPE_PARENT,
+            'father', 'mother', 'parent', 'son', 'daughter', 'child' => FamilyRelationship::TYPE_PARENT,
             'husband', 'wife', 'spouse' => FamilyRelationship::TYPE_SPOUSE,
             'brother', 'sister', 'sibling' => FamilyRelationship::TYPE_SIBLING,
             'guardian', 'ward' => FamilyRelationship::TYPE_GUARDIAN,

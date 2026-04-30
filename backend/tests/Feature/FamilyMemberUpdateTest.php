@@ -608,6 +608,209 @@ class FamilyMemberUpdateTest extends TestCase
         ]);
     }
 
+    public function test_end_user_can_add_parent_and_sibling(): void
+    {
+        $family = Family::query()->create([
+            'name' => 'Shaik Nanne Saheb Family',
+            'slug' => 'shaik-nanne-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $user = User::query()->create([
+            'name' => 'Family User',
+            'email' => 'user@example.com',
+            'password' => 'password123',
+            'role' => User::ROLE_USER,
+            'family_id' => $family->id,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+
+        $child = FamilyMember::query()->create([
+            'family_id' => $family->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Ahmed',
+            'gender' => 'male',
+            'is_living' => true,
+            'is_private' => false,
+            'created_by' => $user->id,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $parentResponse = $this->postJson('/api/v1/family-members', [
+            'family_id' => $family->id,
+            'add_member_type' => 'parent',
+            'existing_person_id' => $child->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Rahman',
+            'gender' => 'male',
+            'living_status' => 'living',
+            'is_private' => false,
+        ]);
+
+        $parentResponse
+            ->assertCreated()
+            ->assertJsonPath('data.member.relation_to_family_head', 'father');
+
+        $parentId = $parentResponse->json('data.member.id');
+
+        $siblingResponse = $this->postJson('/api/v1/family-members', [
+            'family_id' => $family->id,
+            'add_member_type' => 'sibling',
+            'existing_person_id' => $child->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Yasmeen',
+            'gender' => 'female',
+            'living_status' => 'living',
+            'is_private' => false,
+        ]);
+
+        $siblingResponse
+            ->assertCreated()
+            ->assertJsonPath('data.member.relation_to_family_head', 'sister');
+
+        $siblingId = $siblingResponse->json('data.member.id');
+
+        $this->assertDatabaseHas('family_relationships', [
+            'family_id' => $family->id,
+            'from_member_id' => $parentId,
+            'to_member_id' => $child->id,
+            'relationship_type' => FamilyRelationship::TYPE_PARENT,
+        ]);
+
+        $this->assertDatabaseHas('family_relationships', [
+            'family_id' => $family->id,
+            'from_member_id' => $child->id,
+            'to_member_id' => $siblingId,
+            'relationship_type' => FamilyRelationship::TYPE_SIBLING,
+        ]);
+    }
+
+    public function test_end_user_can_attach_existing_person_to_household_without_duplicate(): void
+    {
+        $family = Family::query()->create([
+            'name' => 'Shaik Nanne Saheb Family',
+            'slug' => 'shaik-nanne-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $user = User::query()->create([
+            'name' => 'Family User',
+            'email' => 'user@example.com',
+            'password' => 'password123',
+            'role' => User::ROLE_USER,
+            'family_id' => $family->id,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+
+        $parent = FamilyMember::query()->create([
+            'family_id' => $family->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Madar Saheb',
+            'gender' => 'male',
+            'is_living' => false,
+            'is_private' => false,
+        ]);
+        $child = FamilyMember::query()->create([
+            'family_id' => $family->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Ahmed',
+            'family_head_id' => $parent->id,
+            'relation_to_family_head' => 'son',
+            'is_living' => true,
+            'is_private' => false,
+        ]);
+        $household = Household::query()->create([
+            'family_id' => $family->id,
+            'name' => 'Shaik Madar Saheb Family',
+            'primary_person_id' => $parent->id,
+            'created_by' => $user->id,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/family-members', [
+            'family_id' => $family->id,
+            'add_member_type' => 'existing_to_household',
+            'existing_person_id' => $child->id,
+            'household_id' => $household->id,
+            'is_private' => false,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.member.id', $child->id)
+            ->assertJsonPath('data.household.id', $household->id);
+
+        $this->assertSame(2, FamilyMember::query()->where('family_id', $family->id)->count());
+        $this->assertDatabaseHas('household_members', [
+            'household_id' => $household->id,
+            'member_id' => $child->id,
+            'role' => Household::ROLE_CHILD,
+        ]);
+    }
+
+    public function test_duplicate_child_add_reuses_existing_member(): void
+    {
+        $family = Family::query()->create([
+            'name' => 'Shaik Nanne Saheb Family',
+            'slug' => 'shaik-nanne-saheb-family',
+            'is_active' => true,
+        ]);
+
+        $user = User::query()->create([
+            'name' => 'Family User',
+            'email' => 'user@example.com',
+            'password' => 'password123',
+            'role' => User::ROLE_USER,
+            'family_id' => $family->id,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'is_active' => true,
+        ]);
+
+        $parent = FamilyMember::query()->create([
+            'family_id' => $family->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Madar Saheb',
+            'gender' => 'male',
+            'is_living' => false,
+            'is_private' => false,
+        ]);
+        $household = Household::query()->create([
+            'family_id' => $family->id,
+            'name' => 'Shaik Madar Saheb Family',
+            'primary_person_id' => $parent->id,
+            'created_by' => $user->id,
+        ]);
+        $existingChild = FamilyMember::query()->create([
+            'family_id' => $family->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Ahmed',
+            'gender' => 'male',
+            'family_head_id' => $parent->id,
+            'relation_to_family_head' => 'son',
+            'is_living' => true,
+            'is_private' => false,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/family-members', [
+            'family_id' => $family->id,
+            'add_member_type' => 'child',
+            'household_id' => $household->id,
+            'first_name' => 'Shaik',
+            'last_name' => 'Ahmed',
+            'gender' => 'male',
+            'living_status' => 'living',
+            'is_private' => false,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.member.id', $existingChild->id);
+
+        $this->assertSame(2, FamilyMember::query()->where('family_id', $family->id)->count());
+    }
+
     public function test_admin_can_update_member_profile_fields_from_edit_form_aliases(): void
     {
         $family = Family::query()->create([
