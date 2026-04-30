@@ -4,7 +4,6 @@ import {
   AccountTree,
   ArrowBack,
   Close,
-  Dashboard,
   FamilyRestroom,
   FeedbackOutlined,
   Group,
@@ -29,16 +28,6 @@ import { useAuth } from '../auth/useAuth.js';
 import { ROLES, ROLE_HOME } from '../config/roles.js';
 
 const navItems = [
-  {
-    key: 'overview',
-    label: 'Overview',
-    icon: <Dashboard />,
-    route: {
-      [ROLES.SUPER_ADMIN]: '/super-admin/dashboard',
-      [ROLES.ADMIN]: '/admin/dashboard',
-      [ROLES.USER]: '/app/dashboard',
-    },
-  },
   {
     key: 'members',
     label: 'Members',

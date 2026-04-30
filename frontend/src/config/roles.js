@@ -11,7 +11,7 @@ export const ROLE_LABELS = {
 };
 
 export const ROLE_HOME = {
-  [ROLES.SUPER_ADMIN]: '/super-admin/dashboard',
-  [ROLES.ADMIN]: '/admin/dashboard',
-  [ROLES.USER]: '/app/dashboard',
+  [ROLES.SUPER_ADMIN]: '/super-admin/tree',
+  [ROLES.ADMIN]: '/admin/tree',
+  [ROLES.USER]: '/app/tree',
 };

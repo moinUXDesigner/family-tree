@@ -111,7 +111,7 @@ export function FamilyConnectionPage() {
         isOpen={showInstallPrompt}
         onClose={() => {
           sessionStorage.setItem('familyTreeInstallPromptShown', 'true');
-          navigate('/app/dashboard', { replace: true });
+          navigate('/app/tree', { replace: true });
         }}
       />
 
@@ -140,7 +140,7 @@ export function FamilyConnectionPage() {
               ? `Connected as ${status.member?.display_name} in ${status.member?.family_name}.`
               : status.approval_status === 'rejected'
                 ? `Your request for ${status.member?.family_name} was rejected. Contact the Super Admin for access.`
-                : `Request sent for ${status.member?.family_name}. Super Admin approval is required before dashboard access.`}
+                : `Request sent for ${status.member?.family_name}. Super Admin approval is required before tree access.`}
           </Alert>
         ) : null}
 
@@ -239,11 +239,11 @@ export function FamilyConnectionPage() {
         {status?.is_connected && status.approval_status === 'approved' ? (
           <Button
             fullWidth
-            onClick={() => navigate('/app/dashboard', { replace: true })}
+            onClick={() => navigate('/app/tree', { replace: true })}
             type="button"
             variant="outline"
           >
-            Continue to dashboard
+            Continue to tree
           </Button>
         ) : null}
       </Card>
