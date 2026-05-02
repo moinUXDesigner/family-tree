@@ -61,6 +61,7 @@ class FamilyMemberController extends Controller
         try {
             $data = $this->validatedMemberData($request);
             $family = $this->accessibleFamily($request, (int) $data['family_id'], false);
+            $this->ensureUserCanAddMemberType($request->user(), $data['add_member_type'] ?? null);
             $addMemberType = $data['add_member_type'] ?? null;
 
             [$member, $household] = DB::transaction(function () use ($request, $data, $family, $addMemberType): array {
@@ -416,6 +417,19 @@ class FamilyMemberController extends Controller
             'message' => $message,
             'data' => null,
         ], Response::HTTP_INTERNAL_SERVER_ERROR);
+    }
+
+    private function ensureUserCanAddMemberType(User $user, ?string $addMemberType): void
+    {
+        if (! $user->hasRole(User::ROLE_USER)) {
+            return;
+        }
+
+        if (! in_array($addMemberType, ['child', 'parent', 'sibling'], true)) {
+            throw ValidationException::withMessages([
+                'add_member_type' => ['End users can only add child, parent, or sibling relationships.'],
+            ]);
+        }
     }
 
     /**

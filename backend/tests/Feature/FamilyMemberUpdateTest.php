@@ -687,7 +687,7 @@ class FamilyMemberUpdateTest extends TestCase
         ]);
     }
 
-    public function test_end_user_can_attach_existing_person_to_household_without_duplicate(): void
+    public function test_end_user_cannot_attach_existing_person_to_household(): void
     {
         $family = Family::query()->create([
             'name' => 'Shaik Nanne Saheb Family',
@@ -738,15 +738,13 @@ class FamilyMemberUpdateTest extends TestCase
             'household_id' => $household->id,
             'is_private' => false,
         ])
-            ->assertCreated()
-            ->assertJsonPath('data.member.id', $child->id)
-            ->assertJsonPath('data.household.id', $household->id);
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['add_member_type']);
 
         $this->assertSame(2, FamilyMember::query()->where('family_id', $family->id)->count());
-        $this->assertDatabaseHas('household_members', [
+        $this->assertDatabaseMissing('household_members', [
             'household_id' => $household->id,
             'member_id' => $child->id,
-            'role' => Household::ROLE_CHILD,
         ]);
     }
 
