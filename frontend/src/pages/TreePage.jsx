@@ -62,8 +62,8 @@ export function TreePage({ role }) {
   );
 
   useEffect(() => {
-    setFocusMemberId(familyHeadId);
-  }, [familyHeadId, selectedFamilyId]);
+    setFocusMemberId(defaultFocusedMemberId(tree, user.id, familyHeadId));
+  }, [familyHeadId, tree, user.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -515,6 +515,14 @@ function spouseMemberIds(memberId, spouseLinks) {
   return spouseLinks
     .filter((link) => link.from_member_id === memberId || link.to_member_id === memberId)
     .map((link) => (link.from_member_id === memberId ? link.to_member_id : link.from_member_id));
+}
+
+function defaultFocusedMemberId(tree, userId, familyHeadId) {
+  return tree.nodes.find((node) => node.user_id === userId)?.id
+    ?? familyHeadId
+    ?? tree.root_member_ids?.[0]
+    ?? tree.nodes[0]?.id
+    ?? null;
 }
 
 function chooseFamilyHeadId(nodes, links, rootMemberIds) {
