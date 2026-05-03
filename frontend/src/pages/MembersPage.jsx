@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   CalendarDays,
   Globe2,
@@ -87,6 +87,7 @@ const relationshipOptions = [
 
 export function MembersPage({ role }) {
   const { logout, token, user } = useAuth();
+  const location = useLocation();
   const [families, setFamilies] = useState([]);
   const [members, setMembers] = useState([]);
   const [households, setHouseholds] = useState([]);
@@ -295,6 +296,27 @@ export function MembersPage({ role }) {
     setForm({ ...emptyForm, family_id: selectedFamilyId });
     setIsAddingMember(true);
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('quick_add') !== '1') {
+      return;
+    }
+
+    const type = params.get('type') ?? 'spouse';
+    const addType = ['spouse', 'child', 'parent', 'sibling', 'existing_to_household'].includes(type) ? type : 'spouse';
+    const existingPersonId = params.get('existing_person_id') ?? '';
+
+    setEditingMember(null);
+    setIsAddingMember(true);
+    setForm((current) => ({
+      ...emptyForm,
+      family_id: current.family_id || selectedFamilyId,
+      add_member_type: addType,
+      existing_person_id: needsExistingPerson(addType) ? existingPersonId : '',
+      marital_status: ['child', 'sibling'].includes(addType) ? 'unmarried' : 'married',
+    }));
+  }, [location.search, selectedFamilyId]);
 
   function hideAddMemberForm() {
     setError('');

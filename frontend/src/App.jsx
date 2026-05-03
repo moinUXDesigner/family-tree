@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { RegisterPage } from './pages/RegisterPage.jsx';
 import { ApprovalsPage } from './pages/ApprovalsPage.jsx';
+import { ActivityPage } from './pages/ActivityPage.jsx';
 import { ChangePasswordPage } from './pages/ChangePasswordPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { FamiliesPage } from './pages/FamiliesPage.jsx';
@@ -12,7 +13,6 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage.jsx';
 import { MembersPage } from './pages/MembersPage.jsx';
 import { PasswordChangedPage } from './pages/PasswordChangedPage.jsx';
 import { ProfilePage } from './pages/ProfilePage.jsx';
-import { RelationshipsPage } from './pages/RelationshipsPage.jsx';
 import { RootFamilyPage } from './pages/RootFamilyPage.jsx';
 import { ResetPasswordPage } from './pages/ResetPasswordPage.jsx';
 import { TreePage } from './pages/TreePage.jsx';
@@ -64,10 +64,7 @@ export function App() {
           <Route path="/super-admin/families" element={<FamiliesPage />} />
           <Route path="/super-admin/approvals" element={<ApprovalsPage />} />
           <Route path="/super-admin/users" element={<UsersPage />} />
-          <Route
-            path="/super-admin/relationships"
-            element={<RelationshipsPage role={ROLES.SUPER_ADMIN} />}
-          />
+          <Route path="/super-admin/activity" element={<ActivityPage role={ROLES.SUPER_ADMIN} />} />
           <Route path="/super-admin/root-family" element={<RootFamilyPage />} />
           <Route path="/super-admin/tree" element={<TreePage role={ROLES.SUPER_ADMIN} />} />
           <Route path="/super-admin/feedback" element={<FeedbackPage role={ROLES.SUPER_ADMIN} />} />
@@ -77,7 +74,7 @@ export function App() {
         <Route element={<RequireRole roles={[ROLES.ADMIN]} />}>
           <Route path="/admin/dashboard" element={<DashboardPage role={ROLES.ADMIN} />} />
           <Route path="/admin/members" element={<MembersPage role={ROLES.ADMIN} />} />
-          <Route path="/admin/relationships" element={<RelationshipsPage role={ROLES.ADMIN} />} />
+          <Route path="/admin/activity" element={<ActivityPage role={ROLES.ADMIN} />} />
           <Route path="/admin/tree" element={<TreePage role={ROLES.ADMIN} />} />
           <Route path="/admin/feedback" element={<FeedbackPage role={ROLES.ADMIN} />} />
           <Route path="/admin/feedbacks" element={<FeedbackInboxPage role={ROLES.ADMIN} />} />
@@ -89,7 +86,6 @@ export function App() {
           <Route element={<RequireFamilyConnection />}>
             <Route path="/app/dashboard" element={<DashboardPage role={ROLES.USER} />} />
             <Route path="/app/members" element={<MembersPage role={ROLES.USER} />} />
-            <Route path="/app/relationships" element={<RelationshipsPage role={ROLES.USER} />} />
             <Route path="/app/tree" element={<TreePage role={ROLES.USER} />} />
           </Route>
         </Route>

@@ -6,7 +6,7 @@ import {
   Close,
   FamilyRestroom,
   FeedbackOutlined,
-  Group,
+  AddCircleOutline,
   Logout as LogoutIcon,
   ManageAccounts,
   Menu,
@@ -14,6 +14,7 @@ import {
   PeopleAlt,
   RateReview,
   RecentActors,
+  History,
   VerifiedUser,
 } from '@mui/icons-material';
 import {
@@ -37,16 +38,6 @@ const navItems = [
       [ROLES.SUPER_ADMIN]: '/super-admin/members',
       [ROLES.ADMIN]: '/admin/members',
       [ROLES.USER]: '/app/members',
-    },
-  },
-  {
-    key: 'relationships',
-    label: 'Links',
-    icon: <Group />,
-    route: {
-      [ROLES.SUPER_ADMIN]: '/super-admin/relationships',
-      [ROLES.ADMIN]: '/admin/relationships',
-      [ROLES.USER]: '/app/relationships',
     },
   },
   {
@@ -87,6 +78,16 @@ const navItems = [
     },
   },
   {
+    key: 'activity',
+    label: 'Activity',
+    icon: <History />,
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+    route: {
+      [ROLES.SUPER_ADMIN]: '/super-admin/activity',
+      [ROLES.ADMIN]: '/admin/activity',
+    },
+  },
+  {
     key: 'root-family',
     label: 'Nanne Tree',
     icon: <FamilyRestroom />,
@@ -108,7 +109,7 @@ const feedbackInboxRoutes = {
   [ROLES.ADMIN]: '/admin/feedbacks',
 };
 
-const bottomNavHiddenKeys = new Set(['relationships', 'families', 'root-family']);
+const bottomNavHiddenKeys = new Set(['families', 'root-family', 'users', 'approvals']);
 
 export function NavigationChrome({ active, mobileBackTo = '', role }) {
   const { logout, user } = useAuth();
@@ -116,6 +117,7 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const visibleNavItems = navItems.filter((item) => !item.roles || item.roles.includes(role));
   const bottomNavItems = visibleNavItems.filter((item) => !bottomNavHiddenKeys.has(item.key));
+  const quickAddRoute = `${visibleNavItems.find((item) => item.key === 'members')?.route[role] ?? '/app/members'}?quick_add=1`;
 
   function closeMobileSidebar() {
     setIsMobileSidebarOpen(false);
@@ -237,6 +239,13 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
 
       <Paper className="bottom-nav-shell" elevation={8}>
         <BottomNavigation showLabels value={active}>
+          <BottomNavigationAction
+            component={Link}
+            icon={<AddCircleOutline />}
+            label="Add Member"
+            to={quickAddRoute}
+            value="quick-add"
+          />
           {bottomNavItems.map((item) => (
             <BottomNavigationAction
               component={Link}
@@ -247,6 +256,13 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
               value={item.key}
             />
           ))}
+          <BottomNavigationAction
+            component={Link}
+            icon={<FeedbackOutlined />}
+            label="Feedback"
+            to={feedbackRoutes[role]}
+            value="feedback"
+          />
         </BottomNavigation>
       </Paper>
     </>

@@ -291,12 +291,12 @@ function FocusedFamilyGraph({ family, familyHeadId, focusMemberId, onFocus, role
         />
       </div>
 
-      <MobileFocusedFamilyGraph family={family} familyHeadId={familyHeadId} onFocus={onFocus} />
+      <MobileFocusedFamilyGraph family={family} familyHeadId={familyHeadId} onFocus={onFocus} role={role} />
     </>
   );
 }
 
-function MobileFocusedFamilyGraph({ family, familyHeadId, onFocus }) {
+function MobileFocusedFamilyGraph({ family, familyHeadId, onFocus, role }) {
   return (
     <div className="mobile-tree-card">
       <div className="mobile-tree-panel-header">
@@ -312,7 +312,7 @@ function MobileFocusedFamilyGraph({ family, familyHeadId, onFocus }) {
               <MobilePersonBubble key={member.id} member={member} onFocus={onFocus} showYears />
             ))
           ) : (
-            <MobileEmptyState label="Parents not added" />
+            <MobileEmptyState label="Parents not added" role={role} selfMemberId={family.self.id} type="parent" />
           )}
         </div>
 
@@ -332,7 +332,7 @@ function MobileFocusedFamilyGraph({ family, familyHeadId, onFocus }) {
                 <MobilePersonBubble key={member.id} member={member} onFocus={onFocus} />
               ))
             ) : (
-              <MobileEmptyState label="Spouse not added" />
+              <MobileEmptyState label="Spouse not added" role={role} selfMemberId={family.self.id} type="spouse" />
             )}
           </div>
         </section>
@@ -346,7 +346,7 @@ function MobileFocusedFamilyGraph({ family, familyHeadId, onFocus }) {
               <MobilePersonRow key={member.id} member={member} onFocus={onFocus} />
             ))
           ) : (
-            <MobileEmptyState label="Siblings not added" />
+            <MobileEmptyState label="Siblings not added" role={role} selfMemberId={family.self.id} type="sibling" />
           )}
         </div>
 
@@ -367,7 +367,7 @@ function MobileFocusedFamilyGraph({ family, familyHeadId, onFocus }) {
                 <MobilePersonRow key={member.id} member={member} onFocus={onFocus} />
               ))
             ) : (
-              <MobileEmptyState label="Children not added" />
+              <MobileEmptyState label="Children not added" role={role} selfMemberId={family.self.id} type="child" />
             )}
           </div>
         </details>
@@ -419,8 +419,17 @@ function MobilePersonRow({ member, onFocus }) {
   );
 }
 
-function MobileEmptyState({ label }) {
-  return <div className="mobile-tree-empty">{label}</div>;
+function MobileEmptyState({ label, role, selfMemberId, type }) {
+  const target = `${memberRoutes[role] ?? '/app/members'}?quick_add=1&type=${encodeURIComponent(type)}&existing_person_id=${encodeURIComponent(selfMemberId)}`;
+
+  return (
+    <div className="mobile-tree-empty">
+      <span>{label}</span>
+      <Button component={Link} to={target} type="button" variant="outline">
+        <Plus aria-hidden="true" size={14} />
+      </Button>
+    </div>
+  );
 }
 
 function TreeRelationSection({ emptyLabel, members, onFocus, role, selfMemberId, title, type }) {

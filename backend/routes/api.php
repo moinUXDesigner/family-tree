@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ActivityController;
 use App\Http\Controllers\Api\FamilyConnectionController;
 use App\Http\Controllers\Api\FamilyController;
 use App\Http\Controllers\Api\FamilyMemberController;
@@ -27,7 +28,7 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
-    Route::middleware('auth:sanctum')->group(function (): void {
+    Route::middleware(['auth:sanctum', 'audit'])->group(function (): void {
         Route::get('/me', [AuthController::class, 'me']);
         Route::put('/me', [AuthController::class, 'updateProfile']);
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -52,6 +53,7 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/family-relationships/{familyRelationship}', [FamilyRelationshipController::class, 'destroy']);
             Route::get('/feedback', [FeedbackController::class, 'index']);
             Route::put('/feedback/{feedbackSubmission}', [FeedbackController::class, 'update']);
+            Route::get('/activity-trails', [ActivityController::class, 'index']);
         });
 
         Route::middleware('role:super_admin')->group(function (): void {
