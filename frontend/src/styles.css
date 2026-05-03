@@ -547,6 +547,10 @@ p {
   gap: 12px;
 }
 
+.members-desktop-add-btn {
+  text-transform: none !important;
+}
+
 .dashboard-header p {
   max-width: 720px;
   margin: 12px 0 0;
@@ -3430,6 +3434,10 @@ p {
   .auth-panel h1,
   .dashboard-header h1 {
     font-size: 1.65rem;
+  }
+
+  .members-desktop-add-btn {
+    display: none !important;
   }
 
   .members-metric-strip {

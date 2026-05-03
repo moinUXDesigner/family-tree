@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { Alert as MuiAlert, Snackbar } from '@mui/material';
 import {
   CalendarDays,
   Globe2,
@@ -462,6 +463,14 @@ export function MembersPage({ role }) {
             <div>
               <div className="members-header-row">
                 <h1>Family Members</h1>
+                <Button
+                  className="members-desktop-add-btn"
+                  onClick={showAddMemberForm}
+                  type="button"
+                >
+                  <Plus aria-hidden="true" />
+                  Add Member
+                </Button>
               </div>
             </div>
           ) : <div />}
@@ -472,7 +481,16 @@ export function MembersPage({ role }) {
         </header>
 
         {error ? <Alert variant="error">{error}</Alert> : null}
-        {success ? <Alert variant="success">{success}</Alert> : null}
+        <Snackbar
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          autoHideDuration={5000}
+          onClose={() => setSuccess('')}
+          open={Boolean(success)}
+        >
+          <MuiAlert elevation={6} onClose={() => setSuccess('')} severity="success" variant="filled">
+            {success}
+          </MuiAlert>
+        </Snackbar>
 
         {!isMemberFormOpen ? (
           <div className="members-summary-row">

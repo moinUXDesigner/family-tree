@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Network } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
@@ -115,12 +115,19 @@ const bottomNavHiddenKeys = new Set(['members', 'families', 'root-family', 'user
 
 export function NavigationChrome({ active, mobileBackTo = '', role }) {
   const { logout, user } = useAuth();
+  const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const isMobileViewport = useMediaQuery('(max-width:820px)');
   const visibleNavItems = navItems.filter((item) => !item.roles || item.roles.includes(role));
   const bottomNavItems = visibleNavItems.filter((item) => !bottomNavHiddenKeys.has(item.key));
   const quickAddRoute = `${visibleNavItems.find((item) => item.key === 'members')?.route[role] ?? '/app/members'}?quick_add=1`;
+
+  function openQuickAdd(event) {
+    event.preventDefault();
+    const separator = quickAddRoute.includes('?') ? '&' : '?';
+    navigate(`${quickAddRoute}${separator}open=${Date.now()}`);
+  }
 
   function closeMobileSidebar() {
     setIsMobileSidebarOpen(false);
@@ -263,10 +270,10 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
           ))}
           <BottomNavigationAction
             className="quick-add-nav-action"
-            component={Link}
+            component="button"
             icon={<AddCircle />}
             label="Add Member"
-            to={quickAddRoute}
+            onClick={openQuickAdd}
             value="quick-add"
           />
           <BottomNavigationAction
