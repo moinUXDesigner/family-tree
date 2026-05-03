@@ -6,7 +6,7 @@ import {
   Close,
   FamilyRestroom,
   FeedbackOutlined,
-  AddCircleOutline,
+  AddCircle,
   Logout as LogoutIcon,
   ManageAccounts,
   Menu,
@@ -241,7 +241,7 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
         <BottomNavigation showLabels value={active}>
           <BottomNavigationAction
             component={Link}
-            icon={<AddCircleOutline />}
+            icon={<AddCircle />}
             label="Add Member"
             to={quickAddRoute}
             value="quick-add"
