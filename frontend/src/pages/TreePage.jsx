@@ -504,7 +504,8 @@ function buildFocusedFamily(focusMemberId, nodeMap, links) {
   const children = uniqueNodes(
     parentLinks
       .filter((link) => link.from_member_id === focusMemberId || spouseIds.includes(link.from_member_id))
-      .map((link) => nodeMap.get(link.to_member_id)),
+      .map((link) => nodeMap.get(link.to_member_id))
+      .filter((node) => isChildNode(node)),
   );
   const siblingsFromParents = parentLinks
     .filter((link) => parentIds.has(link.from_member_id) && link.to_member_id !== focusMemberId)
@@ -595,6 +596,14 @@ function uniqueNodes(nodes) {
 
 function genderClass(gender) {
   return ['male', 'female'].includes(gender) ? gender : 'unknown';
+}
+
+function isChildNode(node) {
+  if (!node) {
+    return false;
+  }
+
+  return ['child', 'son', 'daughter'].includes(node.relation_to_family_head);
 }
 
 function year(value) {

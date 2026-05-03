@@ -231,6 +231,8 @@ class FamilyTreeController extends Controller
             'birth_date' => $member->birth_date?->format('Y-m-d'),
             'death_date' => $member->death_date?->format('Y-m-d'),
             'is_living' => $member->is_living,
+            'family_head_id' => $member->family_head_id,
+            'relation_to_family_head' => $member->relation_to_family_head,
             'location' => trim(collect([$member->current_city, $member->current_country])->filter()->join(', ')),
         ];
     }

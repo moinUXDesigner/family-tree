@@ -78,6 +78,9 @@ const relationshipOptions = [
   ['brother', 'Brother'],
   ['sister', 'Sister'],
   ['sibling', 'Sibling'],
+  ['brother_in_law', 'Brother-in-law'],
+  ['sister_in_law', 'Sister-in-law'],
+  ['in_law', 'In-law'],
   ['guardian', 'Guardian'],
   ['ward', 'Ward'],
 ];

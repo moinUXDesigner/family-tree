@@ -863,6 +863,8 @@ class FamilyMemberController extends Controller
             ->where('family_id', $family->id)
             ->findOrFail((int) $data['existing_person_id']);
         $relationship = $this->siblingRelationFor($data['gender'] ?? null);
+        $isSiblingOfSpouse = $sibling->family_head_id
+            && in_array($sibling->relation_to_family_head, ['spouse', 'wife', 'husband'], true);
         $siblingParentIds = FamilyRelationship::query()
             ->where('family_id', $family->id)
             ->where('relationship_type', FamilyRelationship::TYPE_PARENT)
@@ -870,12 +872,19 @@ class FamilyMemberController extends Controller
             ->pluck('from_member_id')
             ->unique()
             ->values();
+        $memberRelationship = $isSiblingOfSpouse
+            ? $this->inLawRelationFor($data['gender'] ?? null)
+            : $relationship;
+        $memberFamilyHeadId = $isSiblingOfSpouse
+            ? $sibling->family_head_id
+            : $siblingParentIds->first();
+
         $member = $this->createOrReuseMember($family, [
             ...$data,
-            'family_head_id' => $sibling->family_head_id ?: $siblingParentIds->first(),
-            'relation_to_family_head' => $relationship,
+            'family_head_id' => $memberFamilyHeadId,
+            'relation_to_family_head' => $memberRelationship,
             'marital_status' => $data['marital_status'] ?? 'unmarried',
-        ], $user, $relationship, [$sibling->id]);
+        ], $user, $memberRelationship, [$sibling->id]);
 
         $this->createFamilyRelationship(
             $family,
@@ -1113,6 +1122,15 @@ class FamilyMemberController extends Controller
             'male' => 'brother',
             'female' => 'sister',
             default => 'sibling',
+        };
+    }
+
+    private function inLawRelationFor(?string $gender): string
+    {
+        return match ($gender) {
+            'male' => 'brother_in_law',
+            'female' => 'sister_in_law',
+            default => 'in_law',
         };
     }
 
