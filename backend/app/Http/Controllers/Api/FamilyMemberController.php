@@ -1277,7 +1277,7 @@ class FamilyMemberController extends Controller
             'current_city' => $member->current_city,
             'current_country' => $member->current_country,
             'family_head_id' => $member->family_head_id,
-            'relation_to_family_head' => $member->relation_to_family_head,
+            'relation_to_family_head' => $this->resolvedRelationToFamilyHead($member),
             'marital_status' => $member->marital_status,
             'graveyard_location' => $member->graveyard_location,
             'notes' => $member->notes,
@@ -1327,5 +1327,66 @@ class FamilyMemberController extends Controller
     private function uniqueFamilySlugCandidate(string $name): string
     {
         return Str::slug($name) ?: 'family';
+    }
+
+    private function resolvedRelationToFamilyHead(FamilyMember $member): ?string
+    {
+        $relation = $member->relation_to_family_head;
+
+        if (
+            ! in_array($relation, ['brother', 'sister', 'sibling'], true)
+            || ! $member->family_head_id
+        ) {
+            return $relation;
+        }
+
+        $spouseIds = FamilyRelationship::query()
+            ->where('family_id', $member->family_id)
+            ->where('relationship_type', FamilyRelationship::TYPE_SPOUSE)
+            ->where(function (Builder $query) use ($member): void {
+                $query
+                    ->where('from_member_id', $member->family_head_id)
+                    ->orWhere('to_member_id', $member->family_head_id);
+            })
+            ->get()
+            ->flatMap(fn (FamilyRelationship $relationship): array => [
+                $relationship->from_member_id,
+                $relationship->to_member_id,
+            ])
+            ->reject(fn (int $id): bool => $id === (int) $member->family_head_id)
+            ->unique()
+            ->values();
+
+        if ($spouseIds->isEmpty()) {
+            return $relation;
+        }
+
+        $isSiblingOfSpouse = FamilyRelationship::query()
+            ->where('family_id', $member->family_id)
+            ->where('relationship_type', FamilyRelationship::TYPE_SIBLING)
+            ->where(function (Builder $query) use ($member, $spouseIds): void {
+                $query
+                    ->where(function (Builder $query) use ($member, $spouseIds): void {
+                        $query
+                            ->where('from_member_id', $member->id)
+                            ->whereIn('to_member_id', $spouseIds->all());
+                    })
+                    ->orWhere(function (Builder $query) use ($member, $spouseIds): void {
+                        $query
+                            ->where('to_member_id', $member->id)
+                            ->whereIn('from_member_id', $spouseIds->all());
+                    });
+            })
+            ->exists();
+
+        if (! $isSiblingOfSpouse) {
+            return $relation;
+        }
+
+        return match ($relation) {
+            'brother' => 'brother_in_law',
+            'sister' => 'sister_in_law',
+            default => 'in_law',
+        };
     }
 }
