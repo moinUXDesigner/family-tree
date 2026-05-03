@@ -425,9 +425,9 @@ class FamilyMemberController extends Controller
             return;
         }
 
-        if (! in_array($addMemberType, ['child', 'parent', 'sibling'], true)) {
+        if (! in_array($addMemberType, ['spouse', 'child', 'parent', 'sibling'], true)) {
             throw ValidationException::withMessages([
-                'add_member_type' => ['End users can only add child, parent, or sibling relationships.'],
+                'add_member_type' => ['End users can only add spouse, child, parent, or sibling relationships.'],
             ]);
         }
     }
