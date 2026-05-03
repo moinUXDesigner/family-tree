@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import path from 'node:path';
 
 export default defineConfig(() => {
   const env = process.env;
@@ -9,6 +10,12 @@ export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
+      alias: {
+        react: path.resolve(__dirname, 'node_modules/react'),
+        'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+        '@emotion/react': path.resolve(__dirname, 'node_modules/@emotion/react'),
+        '@emotion/styled': path.resolve(__dirname, 'node_modules/@emotion/styled'),
+      },
       dedupe: ['react', 'react-dom', '@emotion/react', '@emotion/styled'],
     },
     optimizeDeps: {

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Network } from 'lucide-react';
+import { motion } from 'framer-motion';
 import {
-  AccountTree,
   ArrowBack,
   Close,
   FamilyRestroom,
@@ -25,6 +26,7 @@ import {
   Paper,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from '@mui/material';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLES, ROLE_HOME, ROLE_LABELS } from '../config/roles.js';
@@ -43,7 +45,7 @@ const navItems = [
   {
     key: 'tree',
     label: 'Tree',
-    icon: <AccountTree />,
+    icon: <Network size={20} />,
     route: {
       [ROLES.SUPER_ADMIN]: '/super-admin/tree',
       [ROLES.ADMIN]: '/admin/tree',
@@ -109,12 +111,13 @@ const feedbackInboxRoutes = {
   [ROLES.ADMIN]: '/admin/feedbacks',
 };
 
-const bottomNavHiddenKeys = new Set(['families', 'root-family', 'users', 'approvals']);
+const bottomNavHiddenKeys = new Set(['members', 'families', 'root-family', 'users', 'approvals']);
 
 export function NavigationChrome({ active, mobileBackTo = '', role }) {
   const { logout, user } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const isMobileViewport = useMediaQuery('(max-width:820px)');
   const visibleNavItems = navItems.filter((item) => !item.roles || item.roles.includes(role));
   const bottomNavItems = visibleNavItems.filter((item) => !bottomNavHiddenKeys.has(item.key));
   const quickAddRoute = `${visibleNavItems.find((item) => item.key === 'members')?.route[role] ?? '/app/members'}?quick_add=1`;
@@ -147,8 +150,7 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
           </IconButton>
         )}
         <div className="mobile-app-title">
-          <AccountTree aria-hidden="true" />
-          <strong>Family Tree</strong>
+          <Network aria-hidden="true" />
         </div>
         <div className="mobile-app-profile">
           <span className="mobile-app-role">{ROLE_LABELS[user?.role] ?? 'User'}</span>
@@ -166,17 +168,27 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
       />
 
       <Paper
+        animate={
+          isMobileViewport
+            ? undefined
+            : {
+              width: isCollapsed ? 88 : 260,
+              paddingLeft: isCollapsed ? 14 : 18,
+              paddingRight: isCollapsed ? 14 : 18,
+            }
+        }
         className={[
           'sidebar',
           isCollapsed ? 'collapsed' : '',
           isMobileSidebarOpen ? 'mobile-open' : '',
         ].filter(Boolean).join(' ')}
-        component="aside"
+        component={motion.aside}
         elevation={0}
         square
+        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       >
         <div className="sidebar-brand">
-          <AccountTree aria-hidden="true" />
+          <Network aria-hidden="true" />
           <Typography component="span" variant="subtitle1">
             Family Tree
           </Typography>
@@ -238,14 +250,7 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
       </Paper>
 
       <Paper className="bottom-nav-shell" elevation={8}>
-        <BottomNavigation showLabels value={active}>
-          <BottomNavigationAction
-            component={Link}
-            icon={<AddCircle />}
-            label="Add Member"
-            to={quickAddRoute}
-            value="quick-add"
-          />
+        <BottomNavigation className="mobile-bottom-nav" showLabels value={active}>
           {bottomNavItems.map((item) => (
             <BottomNavigationAction
               component={Link}
@@ -256,6 +261,14 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
               value={item.key}
             />
           ))}
+          <BottomNavigationAction
+            className="quick-add-nav-action"
+            component={Link}
+            icon={<AddCircle />}
+            label="Add Member"
+            to={quickAddRoute}
+            value="quick-add"
+          />
           <BottomNavigationAction
             component={Link}
             icon={<FeedbackOutlined />}

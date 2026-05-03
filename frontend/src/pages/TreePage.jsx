@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, LogOut, Network, Plus, RotateCcw, UsersRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth.js';
-import { ROLE_HOME, ROLE_LABELS, ROLES } from '../config/roles.js';
+import { ROLE_HOME, ROLES } from '../config/roles.js';
 import { NavigationChrome } from '../app/NavigationChrome.jsx';
 import { Alert, Badge, Button, Card } from '../app/components';
 import { familyApi } from '../services/familyApi.js';
@@ -143,9 +143,6 @@ export function TreePage({ role }) {
       <section className="dashboard-content tree-dashboard-content">
         <header className="dashboard-header">
           <div>
-            <Badge variant="primary">{ROLE_LABELS[user.role]}</Badge>
-            <h1>{tree.family?.name ?? 'Family Tree'}</h1>
-            <p>Tap a person to view parents, spouse, children, and siblings.</p>
           </div>
           <Button onClick={logout} type="button" variant="outline">
             <LogOut aria-hidden="true" />
@@ -396,7 +393,7 @@ function MobilePersonBubble({ isFamilyHead = false, isFocused = false, member, o
         ].filter(Boolean).join(' ')}
         aria-hidden="true"
       >
-        {initials(member.name)}
+        <Network aria-hidden="true" size={22} />
       </span>
       <strong>{member.name}</strong>
       {showYears ? <small>{lifeYears(member)}</small> : null}
@@ -408,7 +405,7 @@ function MobilePersonRow({ member, onFocus }) {
   return (
     <button className="mobile-person-row" onClick={() => onFocus(member.id)} type="button">
       <span className={`mobile-row-avatar ${genderClass(member.gender)}`} aria-hidden="true">
-        {initials(member.name)}
+        <Network aria-hidden="true" size={18} />
       </span>
       <span>
         <strong>{member.name}</strong>
@@ -459,7 +456,7 @@ function TreePersonCard({ isFamilyHead = false, isFocused = false, member, onFoc
       type="button"
     >
       <span className={`tree-person-avatar ${genderClass(member.gender)}`} aria-hidden="true">
-        {initials(member.name)}
+        <Network aria-hidden="true" size={20} />
       </span>
       <span className="tree-person-copy">
         <strong>{isFocused ? `${member.name} (Self)` : member.name}</strong>
@@ -644,11 +641,3 @@ function lifeYears(member) {
   return member.is_living ? 'Living' : 'Dead';
 }
 
-function initials(name) {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('');
-}

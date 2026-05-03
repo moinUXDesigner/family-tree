@@ -6,11 +6,15 @@ import {
   LogOut,
   Mail,
   MapPin,
+  Search,
+  Eye,
   Pencil,
   Phone,
   Plus,
+  Network,
   UserRound,
   UsersRound,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLE_HOME, ROLE_LABELS, ROLES } from '../config/roles.js';
@@ -98,27 +102,66 @@ export function MembersPage({ role }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
+  const [viewingMember, setViewingMember] = useState(null);
   const [directoryFamilyId, setDirectoryFamilyId] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('name_asc');
+  const [addStep, setAddStep] = useState(1);
+  const [isStep3Confirmed, setIsStep3Confirmed] = useState(false);
 
   const canDeleteMembers = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
   const canEditMembers = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
   const isMemberFormOpen = isAddingMember || Boolean(editingMember);
   const isEditingMember = Boolean(editingMember);
+  const isViewingMember = Boolean(viewingMember);
   const selectedFamilyId = form.family_id || directoryFamilyId || families[0]?.id || user.family_id || '';
   const canSubmitMemberForm = isEditingMember
     ? Boolean(selectedFamilyId && form.first_name)
-    : canSubmitAddMemberForm(selectedFamilyId, form);
+    : canSubmitAddMemberForm(selectedFamilyId, form) && isStep3Confirmed;
 
   const stats = useMemo(() => {
     const livingCount = members.filter((member) => member.is_living).length;
-    const linkedCount = members.filter((member) => member.user_id).length;
 
     return [
       ['Members', members.length],
       ['Living', livingCount],
-      ['Linked users', linkedCount],
     ];
   }, [members]);
+
+  const filteredMembers = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    const source = query
+      ? members.filter((member) => [
+        member.display_name,
+        member.email,
+        member.phone,
+        member.display_family_name,
+        member.household_name,
+        member.current_city,
+        member.current_country,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query))
+      : [...members];
+
+    return source.sort((a, b) => {
+      if (sortBy === 'name_desc') {
+        return b.display_name.localeCompare(a.display_name);
+      }
+
+      if (sortBy === 'living_first') {
+        return Number(b.is_living) - Number(a.is_living) || a.display_name.localeCompare(b.display_name);
+      }
+
+      if (sortBy === 'deceased_first') {
+        return Number(a.is_living) - Number(b.is_living) || a.display_name.localeCompare(b.display_name);
+      }
+
+      return a.display_name.localeCompare(b.display_name);
+    });
+  }, [members, searchTerm, sortBy]);
 
   useEffect(() => {
     let isMounted = true;
@@ -167,6 +210,10 @@ export function MembersPage({ role }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (!canSubmitMemberForm) {
+      setError('Please complete required fields before submitting.');
+      return;
+    }
     setError('');
     setSuccess('');
     setIsSubmitting(true);
@@ -294,6 +341,8 @@ export function MembersPage({ role }) {
     setSuccess('');
     setEditingMember(null);
     setForm({ ...emptyForm, family_id: selectedFamilyId });
+    setAddStep(1);
+    setIsStep3Confirmed(false);
     setIsAddingMember(true);
   }
 
@@ -309,6 +358,8 @@ export function MembersPage({ role }) {
 
     setEditingMember(null);
     setIsAddingMember(true);
+    setAddStep(1);
+    setIsStep3Confirmed(false);
     setForm((current) => ({
       ...emptyForm,
       family_id: current.family_id || selectedFamilyId,
@@ -321,6 +372,8 @@ export function MembersPage({ role }) {
   function hideAddMemberForm() {
     setError('');
     setForm({ ...emptyForm, family_id: selectedFamilyId });
+    setAddStep(1);
+    setIsStep3Confirmed(false);
     setEditingMember(null);
     setIsAddingMember(false);
   }
@@ -329,6 +382,8 @@ export function MembersPage({ role }) {
     setError('');
     setSuccess('');
     setEditingMember(member);
+    setAddStep(1);
+    setIsStep3Confirmed(false);
     setIsAddingMember(false);
     setForm({
       ...emptyForm,
@@ -351,23 +406,65 @@ export function MembersPage({ role }) {
     });
   }
 
+  function canProceedStep(step) {
+    if (step === 1) {
+      if (!form.add_member_type) {
+        return false;
+      }
+
+      if (needsExistingPerson(form.add_member_type) && !form.existing_person_id) {
+        return false;
+      }
+
+      if (needsHousehold(form.add_member_type) && !form.household_id) {
+        return false;
+      }
+
+      return true;
+    }
+
+    if (step === 2) {
+      if (form.add_member_type === 'existing_to_household') {
+        return true;
+      }
+
+      return Boolean(form.first_name);
+    }
+
+    return true;
+  }
+
+  function canOpenStep(step) {
+    if (isEditingMember) {
+      return true;
+    }
+
+    if (step <= addStep) {
+      return true;
+    }
+
+    for (let currentStep = 1; currentStep < step; currentStep += 1) {
+      if (!canProceedStep(currentStep)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   return (
     <main className="dashboard-page">
       <NavigationChrome active="members" role={role} />
 
       <section className="dashboard-content">
         <header className="dashboard-header">
-          <div>
-            <div className="members-header-row">
-              <h1>Family Members</h1>
-              {!isMemberFormOpen ? (
-                <Button className="add-member-button" onClick={showAddMemberForm} type="button">
-                  <Plus aria-hidden="true" />
-                  Add Member
-                </Button>
-              ) : null}
+          {!isMemberFormOpen ? (
+            <div>
+              <div className="members-header-row">
+                <h1>Family Members</h1>
+              </div>
             </div>
-          </div>
+          ) : <div />}
           <Button onClick={logout} type="button" variant="outline">
             <LogOut aria-hidden="true" />
             Logout
@@ -377,14 +474,39 @@ export function MembersPage({ role }) {
         {error ? <Alert variant="error">{error}</Alert> : null}
         {success ? <Alert variant="success">{success}</Alert> : null}
 
-        <section className="metric-grid" aria-label="Family member summary">
-          {stats.map(([label, value]) => (
-            <Card className="metric-card" key={label} padding="md" variant="elevated">
-              <span>{label}</span>
-              <strong>{value}</strong>
-            </Card>
-          ))}
-        </section>
+        {!isMemberFormOpen ? (
+          <div className="members-summary-row">
+            <section className="metric-grid members-metric-strip" aria-label="Family member summary">
+              {stats.map(([label, value]) => (
+                <Card className="metric-card" key={label} padding="md" variant="elevated">
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                </Card>
+              ))}
+            </section>
+            <label className="members-sort-control">
+              <span className="sr-only">Sort members</span>
+              <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+                <option value="name_asc">Name A-Z</option>
+                <option value="name_desc">Name Z-A</option>
+                <option value="living_first">Living first</option>
+                <option value="deceased_first">Deceased first</option>
+              </select>
+            </label>
+          </div>
+        ) : null}
+
+        {!isMemberFormOpen ? (
+          <div className="feedback-search-shell">
+            <Search aria-hidden="true" />
+            <input
+              aria-label="Search members"
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search members by name, family, city, phone..."
+              value={searchTerm}
+            />
+          </div>
+        ) : null}
 
         {role === ROLES.SUPER_ADMIN && families.length > 1 && !isMemberFormOpen ? (
           <Card padding="md" variant="bordered">
@@ -409,11 +531,6 @@ export function MembersPage({ role }) {
             <div className="section-heading">
               <div>
                 <h2>{isEditingMember ? 'Edit member' : 'Add member'}</h2>
-                <p>
-                  {isEditingMember
-                    ? 'Update the existing member profile.'
-                    : 'Create relatives or attach an existing person to the right household.'}
-                </p>
               </div>
               <Button onClick={hideAddMemberForm} type="button" variant="outline">
                 Cancel
@@ -441,70 +558,100 @@ export function MembersPage({ role }) {
 
               {!isEditingMember ? (
                 <>
-                  <label className="field-group member-form-wide">
-                    Add Member Type
-                    <select
-                      value={form.add_member_type}
-                      onChange={(event) => updateAddMemberType(event.target.value)}
-                      required
-                    >
-                      {addMemberTypeOptions.map(([value, label, isDisabled]) => (
-                        <option disabled={isDisabled} key={value} value={value}>
-                          {label}
-                        </option>
+                  <div className="member-form-wide">
+                    <div className="members-stepper">
+                      {[
+                        [1, 'Input'],
+                        [2, 'Review'],
+                        [3, 'Contact'],
+                        [4, 'Done'],
+                      ].map(([step, label]) => (
+                        <button
+                          className={addStep === step ? 'active' : ''}
+                          key={step}
+                          disabled={!canOpenStep(step)}
+                          onClick={() => {
+                            if (canOpenStep(step)) {
+                              setAddStep(step);
+                            }
+                          }}
+                          type="button"
+                        >
+                          <span className="step-circle">{step}</span>
+                          <span className="step-label">{label}</span>
+                        </button>
                       ))}
-                    </select>
-                  </label>
+                    </div>
+                  </div>
 
-                  {needsExistingPerson(form.add_member_type) ? (
-                    <label className="field-group member-form-wide">
-                      Existing person
-                      <select
-                        value={form.existing_person_id}
-                        onChange={(event) => updateForm('existing_person_id', event.target.value)}
-                        required
-                      >
-                        <option value="">Select existing person</option>
-                        {members.map((member) => (
-                          <option key={member.id} value={member.id}>
-                            {member.display_name}
-                          </option>
-                        ))}
-                      </select>
-                      <small>
-                        {existingPersonHelpText(form.add_member_type)}
-                        {members.length === 0 ? ' No members are loaded for this family yet.' : ''}
-                      </small>
-                    </label>
-                  ) : null}
+                  {addStep === 1 ? (
+                    <>
+                      <label className="field-group member-form-wide">
+                        Add Member Type
+                        <select
+                          value={form.add_member_type}
+                          onChange={(event) => updateAddMemberType(event.target.value)}
+                          required
+                        >
+                          {addMemberTypeOptions.map(([value, label, isDisabled]) => (
+                            <option disabled={isDisabled} key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
 
-                  {needsHousehold(form.add_member_type) ? (
-                    <label className="field-group member-form-wide">
-                      Household / Couple Family
-                      <select
-                        value={form.household_id}
-                        onChange={(event) => updateForm('household_id', event.target.value)}
-                        required
-                      >
-                        <option value="">Select household</option>
-                        {households.map((household) => (
-                          <option key={household.id} value={household.id}>
-                            {household.name}
-                          </option>
-                        ))}
-                      </select>
-                      <small>
-                        {form.add_member_type === 'existing_to_household'
-                          ? 'Select the household this existing person should be attached to.'
-                          : 'Select the couple household this child belongs to.'}
-                        {households.length === 0 ? ' Add a spouse first to create a household.' : ''}
-                      </small>
-                    </label>
+                      {needsExistingPerson(form.add_member_type) ? (
+                        <label className="field-group member-form-wide">
+                          Existing person
+                          <select
+                            value={form.existing_person_id}
+                            onChange={(event) => updateForm('existing_person_id', event.target.value)}
+                            required
+                          >
+                            <option value="">Select existing person</option>
+                            {members.map((member) => (
+                              <option key={member.id} value={member.id}>
+                                {member.display_name}
+                              </option>
+                            ))}
+                          </select>
+                          <small>
+                            {existingPersonHelpText(form.add_member_type)}
+                            {members.length === 0 ? ' No members are loaded for this family yet.' : ''}
+                          </small>
+                        </label>
+                      ) : null}
+
+                      {needsHousehold(form.add_member_type) ? (
+                        <label className="field-group member-form-wide">
+                          Household / Couple Family
+                          <select
+                            value={form.household_id}
+                            onChange={(event) => updateForm('household_id', event.target.value)}
+                            required
+                          >
+                            <option value="">Select household</option>
+                            {households.map((household) => (
+                              <option key={household.id} value={household.id}>
+                                {household.name}
+                              </option>
+                            ))}
+                          </select>
+                          <small>
+                            {form.add_member_type === 'existing_to_household'
+                              ? 'Select the household this existing person should be attached to.'
+                              : 'Select the couple household this child belongs to.'}
+                            {households.length === 0 ? ' Add a spouse first to create a household.' : ''}
+                          </small>
+                        </label>
+                      ) : null}
+                    </>
                   ) : null}
                 </>
               ) : null}
 
-              {form.add_member_type !== 'existing_to_household' || isEditingMember ? (
+              {(isEditingMember || addStep === 2) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
                 <>
                   <Input
                     label="First name"
@@ -538,6 +685,11 @@ export function MembersPage({ role }) {
                       <option value="prefer_not_to_say">Prefer not to say</option>
                     </select>
                   </label>
+                </>
+              ) : null}
+
+              {(isEditingMember || addStep === 3) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
+                <>
                   <Input
                     label="Email"
                     leftIcon={<Mail aria-hidden="true" size={18} />}
@@ -570,7 +722,7 @@ export function MembersPage({ role }) {
                 </>
               ) : null}
 
-              {form.add_member_type !== 'existing_to_household' || isEditingMember ? (
+              {(isEditingMember || addStep === 4) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
                 <>
                   <label className="field-group member-form-wide">
                     Married / Unmarried
@@ -627,78 +779,123 @@ export function MembersPage({ role }) {
                       />
                     </>
                   ) : null}
+
+                  {!isEditingMember ? (
+                    <label className="field-group member-form-wide">
+                      <span>Confirmation</span>
+                      <label className="members-confirm-checkbox">
+                        <input
+                          checked={isStep3Confirmed}
+                          onChange={(event) => setIsStep3Confirmed(event.target.checked)}
+                          type="checkbox"
+                        />
+                        <span>I have reviewed this member information and want to create it.</span>
+                      </label>
+                    </label>
+                  ) : null}
                 </>
               ) : null}
 
-              <Button
-                className="member-form-action"
-                disabled={isSubmitting || !canSubmitMemberForm}
-                isLoading={isSubmitting}
-                type="submit"
-              >
-                {isEditingMember ? <Pencil aria-hidden="true" /> : <Plus aria-hidden="true" />}
-                {isEditingMember ? 'Update member' : 'Add member'}
-              </Button>
+              {!isEditingMember ? (
+                <div className="member-form-wide members-step-actions">
+                  {addStep > 1 ? (
+                    <Button onClick={() => setAddStep((current) => Math.max(1, current - 1))} type="button" variant="outline">
+                      Back
+                    </Button>
+                  ) : <span />}
+                  {addStep < 4 ? (
+                    <Button disabled={!canProceedStep(addStep)} onClick={() => setAddStep((current) => Math.min(4, current + 1))} type="button">
+                      Next
+                    </Button>
+                  ) : (
+                    <Button
+                      className="member-form-action"
+                      disabled={isSubmitting || !canSubmitMemberForm}
+                      isLoading={isSubmitting}
+                      type="submit"
+                    >
+                      <Plus aria-hidden="true" />
+                      Add member
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <Button
+                  className="member-form-action"
+                  disabled={isSubmitting || !canSubmitMemberForm}
+                  isLoading={isSubmitting}
+                  type="submit"
+                >
+                  <Pencil aria-hidden="true" />
+                  Update member
+                </Button>
+              )}
             </form>
           </Card>
         ) : (
-          <Card padding="lg" variant="elevated">
-          <div className="section-heading">
-            <div>
-              <h2>Member directory</h2>
-              <p>{isLoading ? 'Loading members...' : `${members.length} records available.`}</p>
-            </div>
-          </div>
-
           <div className="member-list">
-            {members.map((member) => (
+            {isViewingMember ? (
+              <section className="member-fullscreen-view" aria-label="Member details">
+                <div className="member-fullscreen-header">
+                  <h3>{viewingMember.display_name}</h3>
+                  <button className="text-action" onClick={() => setViewingMember(null)} type="button">
+                    <X aria-hidden="true" size={16} />
+                    Close
+                  </button>
+                </div>
+                <div className="member-fullscreen-grid">
+                  <div><strong>Status</strong><p>{viewingMember.is_living ? 'Living' : 'Deceased'}</p></div>
+                  <div><strong>Family</strong><p>{viewingMember.display_family_name || 'Not added'}</p></div>
+                  <div><strong>Household</strong><p>{viewingMember.household_name || 'Not added'}</p></div>
+                  <div><strong>Birth Date</strong><p>{viewingMember.birth_date || 'Not added'}</p></div>
+                  <div><strong>Death Date</strong><p>{viewingMember.death_date || 'Not added'}</p></div>
+                  <div><strong>Gender</strong><p>{viewingMember.gender || 'Not added'}</p></div>
+                  <div><strong>Email</strong><p>{viewingMember.email || 'Not added'}</p></div>
+                  <div><strong>Phone</strong><p>{viewingMember.phone || 'Not added'}</p></div>
+                  <div><strong>City</strong><p>{viewingMember.current_city || 'Not added'}</p></div>
+                  <div><strong>Country</strong><p>{viewingMember.current_country || 'Not added'}</p></div>
+                  <div><strong>Relationship</strong><p>{viewingMember.family_head_name && viewingMember.relation_to_family_head ? `${relationshipLabel(viewingMember.relation_to_family_head)} of ${viewingMember.family_head_name}` : 'Not added'}</p></div>
+                  <div><strong>Added By</strong><p>{[viewingMember.creator_name, viewingMember.creator_email].filter(Boolean).join(' | ') || 'Not recorded'}</p></div>
+                </div>
+              </section>
+            ) : null}
+
+            {!isViewingMember ? filteredMembers.map((member) => (
               <article className="member-row" key={member.id}>
-                <div className="member-avatar" aria-hidden="true">
+                <div className="member-leading">
+                  <div className="member-avatar" aria-hidden="true">
                   {member.photo_url ? (
                     <img alt="" src={member.photo_url} />
                   ) : (
-                    initials(member.display_name)
+                      <Network aria-hidden="true" size={18} />
                   )}
+                  </div>
+                  <div className="member-leading-meta">
+                    <Badge variant={member.is_living ? 'success' : 'neutral'}>
+                      {member.is_living ? 'Living' : 'Deceased'}
+                    </Badge>
+                    <button
+                      className="text-action"
+                      onClick={() => setViewingMember(member)}
+                      type="button"
+                    >
+                      <Eye aria-hidden="true" size={16} />
+                      View
+                    </button>
+                  </div>
                 </div>
                 <div className="member-main">
                   <div className="member-title-line">
                     <strong>{member.display_name}</strong>
-                    {member.household_name || member.display_family_name ? (
-                      <Badge variant="neutral">{member.household_name ?? member.display_family_name}</Badge>
-                    ) : null}
                   </div>
-                  <p>
-                    {[member.current_city, member.current_country].filter(Boolean).join(', ') ||
-                      'Location not added'}
-                  </p>
                   <small>
-                    {[member.email, member.phone].filter(Boolean).join(' | ') ||
-                      'No contact details'}
+                    {[
+                      member.household_name ?? member.display_family_name,
+                      [member.current_city, member.current_country].filter(Boolean).join(', '),
+                    ].filter(Boolean).join(' | ') || 'No details'}
                   </small>
-                  <div className="member-detail-lines">
-                    {member.linked_user_email ? (
-                      <span>
-                        Signed up: {member.linked_user_name || member.linked_user_email}
-                        {member.linked_user_name ? ` (${member.linked_user_email})` : ''}
-                      </span>
-                    ) : (
-                      <span>
-                        Added by: {[member.creator_name, member.creator_email].filter(Boolean).join(' | ') ||
-                          'Not recorded'}
-                      </span>
-                    )}
-                    {member.family_head_name && member.relation_to_family_head ? (
-                      <span>
-                        {relationshipLabel(member.relation_to_family_head)} of {member.family_head_name}
-                      </span>
-                    ) : null}
-                    {member.household_name ? <span>Household: {member.household_name}</span> : null}
-                  </div>
                 </div>
                 <div className="member-meta">
-                  <Badge variant={member.is_living ? 'success' : 'neutral'}>
-                    {member.is_living ? 'Living' : 'Deceased'}
-                  </Badge>
                   {canEditMembers ? (
                     <button
                       className="text-action"
@@ -720,17 +917,16 @@ export function MembersPage({ role }) {
                   ) : null}
                 </div>
               </article>
-            ))}
+            )) : null}
 
-            {!isLoading && members.length === 0 ? (
+            {!isViewingMember && !isLoading && filteredMembers.length === 0 ? (
               <div className="empty-state">
                 <UsersRound aria-hidden="true" />
-                <strong>No members yet</strong>
-                <p>Add the first family member to start building the tree.</p>
+                <strong>{searchTerm ? 'No members found' : 'No members yet'}</strong>
+                <p>{searchTerm ? 'Try a different search keyword.' : 'Add the first family member to start building the tree.'}</p>
               </div>
             ) : null}
           </div>
-          </Card>
         )}
       </section>
     </main>
@@ -788,15 +984,6 @@ function createMemberSuccessMessage(result) {
   }
 
   return 'Family member added.';
-}
-
-function initials(name) {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('');
 }
 
 function relationshipLabel(value) {

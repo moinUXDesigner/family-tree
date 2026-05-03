@@ -101,6 +101,21 @@ export function AuthProvider({ children }) {
     clearSession();
   }, [clearSession, token]);
 
+  const updateProfile = useCallback(
+    async (payload) => {
+      if (!token) {
+        throw new Error('Not authenticated.');
+      }
+
+      const response = await apiClient.put('/me', payload, token);
+      const nextUser = response.data.user;
+      localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
+      setUser(nextUser);
+      return nextUser;
+    },
+    [token],
+  );
+
   const value = useMemo(
     () => ({
       isAuthenticated: Boolean(token && user),
@@ -108,11 +123,12 @@ export function AuthProvider({ children }) {
       login,
       logout,
       register,
+      updateProfile,
       clearSession,
       token,
       user,
     }),
-    [clearSession, isCheckingSession, login, logout, register, token, user],
+    [clearSession, isCheckingSession, login, logout, register, token, updateProfile, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

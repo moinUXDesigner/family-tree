@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { LogOut, Plus, Trash2, UsersRound } from 'lucide-react';
+import { LogOut, Plus, Search, Trash2, UsersRound } from 'lucide-react';
 import { NavigationChrome } from '../app/NavigationChrome.jsx';
 import { Alert, Badge, Button, Card, Input } from '../app/components';
 import { useAuth } from '../auth/useAuth.js';
@@ -20,11 +20,30 @@ export function FamiliesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreatingFamily, setIsCreatingFamily] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const totalMembers = useMemo(
     () => families.reduce((total, family) => total + Number(family.members_count ?? 0), 0),
     [families],
   );
+
+  const filteredFamilies = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+
+    if (!query) {
+      return families;
+    }
+
+    return families.filter((family) => [
+      family.name,
+      family.description,
+      String(family.id),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .includes(query));
+  }, [families, searchTerm]);
 
   useEffect(() => {
     let isMounted = true;
@@ -192,8 +211,18 @@ export function FamiliesPage() {
               </Button>
             </div>
 
+            <div className="feedback-search-shell">
+              <Search aria-hidden="true" />
+              <input
+                aria-label="Search families"
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search families by name, description, id..."
+                value={searchTerm}
+              />
+            </div>
+
             <div className="member-list">
-              {families.map((family) => (
+              {filteredFamilies.map((family) => (
                 <article className="member-row" key={family.id}>
                   <div className="member-avatar" aria-hidden="true">
                     {initials(family.name)}
@@ -221,11 +250,11 @@ export function FamiliesPage() {
                 </article>
               ))}
 
-              {!isLoading && families.length === 0 ? (
+              {!isLoading && filteredFamilies.length === 0 ? (
                 <div className="empty-state compact">
                   <UsersRound aria-hidden="true" />
-                  <strong>No families yet</strong>
-                  <p>Create the first family group to start organizing members.</p>
+                  <strong>{searchTerm ? 'No families found' : 'No families yet'}</strong>
+                  <p>{searchTerm ? 'Try a different search keyword.' : 'Create the first family group to start organizing members.'}</p>
                 </div>
               ) : null}
             </div>
