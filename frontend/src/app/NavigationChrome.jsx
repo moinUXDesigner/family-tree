@@ -26,7 +26,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useAuth } from '../auth/useAuth.js';
-import { ROLES, ROLE_HOME } from '../config/roles.js';
+import { ROLES, ROLE_HOME, ROLE_LABELS } from '../config/roles.js';
 
 const navItems = [
   {
@@ -148,9 +148,12 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
           <AccountTree aria-hidden="true" />
           <strong>Family Tree</strong>
         </div>
-        <Avatar className="mobile-app-avatar" src={user?.avatar_url ?? undefined}>
-          {initials(user?.name ?? user?.email ?? 'User')}
-        </Avatar>
+        <div className="mobile-app-profile">
+          <span className="mobile-app-role">{ROLE_LABELS[user?.role] ?? 'User'}</span>
+          <Avatar className="mobile-app-avatar" src={user?.avatar_url ?? undefined}>
+            {initials(user?.name ?? user?.email ?? 'User')}
+          </Avatar>
+        </div>
       </Paper>
 
       <button

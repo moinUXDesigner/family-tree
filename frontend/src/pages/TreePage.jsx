@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, LogOut, Network, RotateCcw, UsersRound } from 'lucide-react';
+import { ChevronDown, ChevronRight, LogOut, Network, Plus, RotateCcw, UsersRound } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLE_HOME, ROLE_LABELS, ROLES } from '../config/roles.js';
 import { NavigationChrome } from '../app/NavigationChrome.jsx';
@@ -203,6 +204,7 @@ export function TreePage({ role }) {
                 familyHeadId={familyHeadId}
                 focusMemberId={focusMemberId}
                 onFocus={setFocusMemberId}
+                role={role}
               />
             ) : null}
 
@@ -222,7 +224,7 @@ export function TreePage({ role }) {
   );
 }
 
-function FocusedFamilyGraph({ family, familyHeadId, focusMemberId, onFocus }) {
+function FocusedFamilyGraph({ family, familyHeadId, focusMemberId, onFocus, role }) {
   return (
     <>
       <div className="focused-tree-canvas desktop-tree-canvas">
@@ -230,7 +232,10 @@ function FocusedFamilyGraph({ family, familyHeadId, focusMemberId, onFocus }) {
           emptyLabel="Parents not added"
           members={family.parents}
           onFocus={onFocus}
+          role={role}
+          selfMemberId={family.self.id}
           title="Parents"
+          type="parent"
         />
 
         <section className="tree-relation-section self-section" aria-label="Selected person and spouse">
@@ -253,7 +258,7 @@ function FocusedFamilyGraph({ family, familyHeadId, focusMemberId, onFocus }) {
                   ))}
                 </div>
               ) : (
-                <EmptyTreeSlot label="Spouse not added" />
+                <EmptyTreeSlot label="Spouse not added" role={role} selfMemberId={family.self.id} type="spouse" />
               )}
             </div>
           </div>
@@ -269,14 +274,20 @@ function FocusedFamilyGraph({ family, familyHeadId, focusMemberId, onFocus }) {
           emptyLabel="Siblings not added"
           members={family.siblings}
           onFocus={onFocus}
+          role={role}
+          selfMemberId={family.self.id}
           title="Siblings"
+          type="sibling"
         />
 
         <TreeRelationSection
           emptyLabel="Children not added"
           members={family.children}
           onFocus={onFocus}
+          role={role}
+          selfMemberId={family.self.id}
           title="Children"
+          type="child"
         />
       </div>
 
@@ -401,7 +412,7 @@ function MobilePersonRow({ member, onFocus }) {
       </span>
       <span>
         <strong>{member.name}</strong>
-        <small>{year(member.birth_date) ?? (member.is_living ? 'Living' : 'Deceased')}</small>
+        <small>{year(member.birth_date) ?? (member.is_living ? 'Living' : 'Dead')}</small>
       </span>
       <ChevronRight aria-hidden="true" />
     </button>
@@ -412,7 +423,7 @@ function MobileEmptyState({ label }) {
   return <div className="mobile-tree-empty">{label}</div>;
 }
 
-function TreeRelationSection({ emptyLabel, members, onFocus, title }) {
+function TreeRelationSection({ emptyLabel, members, onFocus, role, selfMemberId, title, type }) {
   return (
     <section className="tree-relation-section" aria-label={title}>
       <div className="tree-section-title">
@@ -425,7 +436,7 @@ function TreeRelationSection({ emptyLabel, members, onFocus, title }) {
           ))}
         </div>
       ) : (
-        <EmptyTreeSlot label={emptyLabel} />
+        <EmptyTreeSlot label={emptyLabel} role={role} selfMemberId={selfMemberId} type={type} />
       )}
     </section>
   );
@@ -443,18 +454,28 @@ function TreePersonCard({ isFamilyHead = false, isFocused = false, member, onFoc
       </span>
       <span className="tree-person-copy">
         <strong>{isFocused ? `${member.name} (Self)` : member.name}</strong>
-        <span>{member.birth_date ?? 'Birth date not added'}</span>
+        <span>{member.birth_date || member.death_date ? lifeYears(member) : 'Date details not added'}</span>
         {member.location ? <small>{member.location}</small> : null}
       </span>
       <Badge variant={member.is_living ? 'success' : 'neutral'}>
-        {member.is_living ? 'Living' : 'Deceased'}
+        {member.is_living ? 'Living' : 'Dead'}
       </Badge>
     </button>
   );
 }
 
-function EmptyTreeSlot({ label }) {
-  return <div className="tree-empty-slot">{label}</div>;
+function EmptyTreeSlot({ label, role, selfMemberId, type }) {
+  const target = `${memberRoutes[role] ?? '/app/members'}?quick_add=1&type=${encodeURIComponent(type)}&existing_person_id=${encodeURIComponent(selfMemberId)}`;
+
+  return (
+    <div className="tree-empty-slot">
+      <span>{label}</span>
+      <Button component={Link} to={target} type="button" variant="outline">
+        <Plus aria-hidden="true" size={14} />
+        Add
+      </Button>
+    </div>
+  );
 }
 
 function buildFocusedFamily(focusMemberId, nodeMap, links) {
@@ -602,7 +623,7 @@ function lifeYears(member) {
     return `Died ${deathYear}`;
   }
 
-  return member.is_living ? 'Living' : 'Deceased';
+  return member.is_living ? 'Living' : 'Dead';
 }
 
 function initials(name) {

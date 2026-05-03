@@ -174,6 +174,30 @@ class AuthController extends Controller
         ]);
     }
 
+    public function updateProfile(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $user->update([
+            'name' => $data['name'],
+            'phone' => $data['phone'] ?: null,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Profile updated successfully.',
+            'data' => [
+                'user' => $this->userPayload($user->refresh()),
+            ],
+        ]);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()?->delete();

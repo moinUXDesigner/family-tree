@@ -863,9 +863,16 @@ class FamilyMemberController extends Controller
             ->where('family_id', $family->id)
             ->findOrFail((int) $data['existing_person_id']);
         $relationship = $this->siblingRelationFor($data['gender'] ?? null);
+        $siblingParentIds = FamilyRelationship::query()
+            ->where('family_id', $family->id)
+            ->where('relationship_type', FamilyRelationship::TYPE_PARENT)
+            ->where('to_member_id', $sibling->id)
+            ->pluck('from_member_id')
+            ->unique()
+            ->values();
         $member = $this->createOrReuseMember($family, [
             ...$data,
-            'family_head_id' => $sibling->family_head_id ?: $sibling->id,
+            'family_head_id' => $sibling->family_head_id ?: $siblingParentIds->first(),
             'relation_to_family_head' => $relationship,
             'marital_status' => $data['marital_status'] ?? 'unmarried',
         ], $user, $relationship, [$sibling->id]);
@@ -879,10 +886,10 @@ class FamilyMemberController extends Controller
             $user
         );
 
-        if ($sibling->family_head_id) {
+        foreach ($siblingParentIds as $parentId) {
             $this->createFamilyRelationship(
                 $family,
-                $sibling->family_head_id,
+                (int) $parentId,
                 $member->id,
                 FamilyRelationship::TYPE_PARENT,
                 "Added as sibling in {$this->memberName($sibling)} family.",
@@ -1167,6 +1174,9 @@ class FamilyMemberController extends Controller
             'brother',
             'sister',
             'sibling',
+            'brother_in_law',
+            'sister_in_law',
+            'in_law',
             'guardian',
             'ward',
         ];
@@ -1177,7 +1187,7 @@ class FamilyMemberController extends Controller
         return match ($relationship) {
             'father', 'mother', 'parent', 'son', 'daughter', 'child' => FamilyRelationship::TYPE_PARENT,
             'husband', 'wife', 'spouse' => FamilyRelationship::TYPE_SPOUSE,
-            'brother', 'sister', 'sibling' => FamilyRelationship::TYPE_SIBLING,
+            'brother', 'sister', 'sibling', 'brother_in_law', 'sister_in_law', 'in_law' => FamilyRelationship::TYPE_SIBLING,
             'guardian', 'ward' => FamilyRelationship::TYPE_GUARDIAN,
             default => null,
         };

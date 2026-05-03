@@ -536,6 +536,13 @@ p {
   letter-spacing: -0.01562em;
 }
 
+.members-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .dashboard-header p {
   max-width: 720px;
   margin: 12px 0 0;
@@ -650,6 +657,14 @@ p {
   width: 28px;
   height: 28px;
   color: var(--primary);
+}
+
+.add-member-button {
+  text-transform: none !important;
+}
+
+.add-member-button svg {
+  color: #ffffff !important;
 }
 
 .member-form,
@@ -2496,6 +2511,20 @@ p {
     font-weight: 900 !important;
   }
 
+  .mobile-app-profile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .mobile-app-role {
+    color: #4b5563;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
   .sidebar-backdrop.visible {
     position: fixed;
     z-index: 50;
@@ -2708,7 +2737,22 @@ p {
   }
 
   .metric-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    overflow-x: hidden;
+    padding-bottom: 0;
+  }
+
+  .metric-card {
+    padding: 14px;
+  }
+
+  .metric-card span {
+    font-size: 0.78rem;
+  }
+
+  .metric-card strong {
+    font-size: 1.25rem;
   }
 
   .member-form,

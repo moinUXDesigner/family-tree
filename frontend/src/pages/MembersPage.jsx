@@ -333,12 +333,15 @@ export function MembersPage({ role }) {
       <section className="dashboard-content">
         <header className="dashboard-header">
           <div>
-            <Badge variant="primary">{ROLE_LABELS[user.role]}</Badge>
-            <h1>Family Members</h1>
-            <p>
-              Create and review the people records that will power relationships,
-              family trees, maps, and timelines.
-            </p>
+            <div className="members-header-row">
+              <h1>Family Members</h1>
+              {!isMemberFormOpen ? (
+                <Button className="add-member-button" onClick={showAddMemberForm} type="button">
+                  <Plus aria-hidden="true" />
+                  Add Member
+                </Button>
+              ) : null}
+            </div>
           </div>
           <Button onClick={logout} type="button" variant="outline">
             <LogOut aria-hidden="true" />
@@ -620,10 +623,6 @@ export function MembersPage({ role }) {
               <h2>Member directory</h2>
               <p>{isLoading ? 'Loading members...' : `${members.length} records available.`}</p>
             </div>
-            <Button onClick={showAddMemberForm} type="button">
-              <Plus aria-hidden="true" />
-              Add member
-            </Button>
           </div>
 
           <div className="member-list">
