@@ -38,6 +38,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/families', [FamilyController::class, 'index']);
             Route::get('/family-members', [FamilyMemberController::class, 'index']);
             Route::post('/family-members', [FamilyMemberController::class, 'store']);
+            Route::put('/family-members/{familyMember}', [FamilyMemberController::class, 'update']);
             Route::get('/family-relationships', [FamilyRelationshipController::class, 'index']);
             Route::get('/households', [HouseholdController::class, 'index']);
             Route::get('/family-tree', [FamilyTreeController::class, 'show']);
@@ -47,7 +48,6 @@ Route::prefix('v1')->group(function (): void {
         });
 
         Route::middleware('role:admin,super_admin')->group(function (): void {
-            Route::put('/family-members/{familyMember}', [FamilyMemberController::class, 'update']);
             Route::delete('/family-members/{familyMember}', [FamilyMemberController::class, 'destroy']);
             Route::post('/family-relationships', [FamilyRelationshipController::class, 'store']);
             Route::delete('/family-relationships/{familyRelationship}', [FamilyRelationshipController::class, 'destroy']);

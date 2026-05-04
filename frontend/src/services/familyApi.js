@@ -28,12 +28,19 @@ export const familyApi = {
   },
 
   async createMember(token, payload) {
-    const response = await apiClient.post('/family-members', payload, token);
+    const response = payload instanceof FormData
+      ? await apiClient.postForm('/family-members', payload, token)
+      : await apiClient.post('/family-members', payload, token);
     return response.data;
   },
 
   async updateMember(token, memberId, payload) {
-    const response = await apiClient.put(`/family-members/${memberId}`, payload, token);
+    if (payload instanceof FormData) {
+      payload.set('_method', 'PUT');
+    }
+    const response = payload instanceof FormData
+      ? await apiClient.postForm(`/family-members/${memberId}`, payload, token)
+      : await apiClient.put(`/family-members/${memberId}`, payload, token);
     return response.data.member;
   },
 

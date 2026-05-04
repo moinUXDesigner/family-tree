@@ -393,7 +393,7 @@ function MobilePersonBubble({ isFamilyHead = false, isFocused = false, member, o
         ].filter(Boolean).join(' ')}
         aria-hidden="true"
       >
-        <Network aria-hidden="true" size={22} />
+        {member.photo_url ? <img alt="" src={member.photo_url} /> : <Network aria-hidden="true" size={22} />}
       </span>
       <strong>{member.name}</strong>
       {showYears ? <small>{lifeYears(member)}</small> : null}
@@ -405,7 +405,7 @@ function MobilePersonRow({ member, onFocus }) {
   return (
     <button className="mobile-person-row" onClick={() => onFocus(member.id)} type="button">
       <span className={`mobile-row-avatar ${genderClass(member.gender)}`} aria-hidden="true">
-        <Network aria-hidden="true" size={18} />
+        {member.photo_url ? <img alt="" src={member.photo_url} /> : <Network aria-hidden="true" size={18} />}
       </span>
       <span>
         <strong>{member.name}</strong>
@@ -456,7 +456,7 @@ function TreePersonCard({ isFamilyHead = false, isFocused = false, member, onFoc
       type="button"
     >
       <span className={`tree-person-avatar ${genderClass(member.gender)}`} aria-hidden="true">
-        <Network aria-hidden="true" size={20} />
+        {member.photo_url ? <img alt="" src={member.photo_url} /> : <Network aria-hidden="true" size={20} />}
       </span>
       <span className="tree-person-copy">
         <strong>{isFocused ? `${member.name} (Self)` : member.name}</strong>

@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Alert as MuiAlert, Snackbar } from '@mui/material';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
 import {
   CalendarDays,
+  Clock3,
   Globe2,
   LogOut,
   Mail,
@@ -51,6 +54,7 @@ const emptyForm = {
   last_name: '',
   gender: '',
   birth_date: '',
+  birth_time: '',
   death_date: '',
   graveyard_location: '',
   email: '',
@@ -109,6 +113,14 @@ export function MembersPage({ role }) {
   const [sortBy, setSortBy] = useState('name_asc');
   const [addStep, setAddStep] = useState(1);
   const [isStep3Confirmed, setIsStep3Confirmed] = useState(false);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState('');
+  const [photoObjectUrl, setPhotoObjectUrl] = useState('');
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const cameraStreamRef = useRef(null);
 
   const canDeleteMembers = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
   const canEditMembers = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
@@ -236,22 +248,25 @@ export function MembersPage({ role }) {
         graveyard_location: form.living_status === 'deceased' ? form.graveyard_location : null,
         is_private: false,
       };
+      const requestPayload = buildMemberRequestPayload(payload, photoFile);
 
       if (isEditingMember) {
-        const member = await familyApi.updateMember(token, editingMember.id, payload);
+        const member = await familyApi.updateMember(token, editingMember.id, requestPayload);
         setMembers((current) => current.map((item) => (item.id === member.id ? member : item)).sort(sortMembers));
         setDirectoryFamilyId(String(member.family_id));
         setForm({ ...emptyForm, family_id: String(member.family_id) });
+        clearPhotoState('');
         setEditingMember(null);
         setIsAddingMember(false);
         setSuccess('Family member updated.');
         return;
       }
 
-      const result = await familyApi.createMember(token, payload);
+      const result = await familyApi.createMember(token, requestPayload);
       await loadFamilyContext(selectedFamilyId);
       setDirectoryFamilyId(selectedFamilyId);
       setForm({ ...emptyForm, family_id: selectedFamilyId });
+      clearPhotoState('');
       setSuccess(createMemberSuccessMessage(result));
       setIsAddingMember(false);
     } catch (submitError) {
@@ -325,6 +340,75 @@ export function MembersPage({ role }) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  function clearPhotoState(nextPreview = '') {
+    if (photoObjectUrl) {
+      URL.revokeObjectURL(photoObjectUrl);
+      setPhotoObjectUrl('');
+    }
+    setPhotoFile(null);
+    setPhotoPreviewUrl(nextPreview);
+  }
+
+  function stopCamera() {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    }
+    setIsCameraOpen(false);
+  }
+
+  async function openCamera() {
+    setCameraError('');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Camera is not supported in this browser.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      setIsCameraOpen(true);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 0);
+    } catch {
+      setCameraError('Unable to access camera. Please allow camera permission.');
+    }
+  }
+
+  function captureFromCamera() {
+    if (!videoRef.current || !canvasRef.current) {
+      return;
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        return;
+      }
+      clearPhotoState(editingMember?.photo_url ?? '');
+      const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const nextObjectUrl = URL.createObjectURL(file);
+      setPhotoObjectUrl(nextObjectUrl);
+      setPhotoFile(file);
+      setPhotoPreviewUrl(nextObjectUrl);
+      stopCamera();
+    }, 'image/jpeg', 0.9);
+  }
+
   function updateAddMemberType(value) {
     setForm((current) => ({
       ...current,
@@ -344,6 +428,7 @@ export function MembersPage({ role }) {
     setForm({ ...emptyForm, family_id: selectedFamilyId });
     setAddStep(1);
     setIsStep3Confirmed(false);
+    clearPhotoState('');
     setIsAddingMember(true);
   }
 
@@ -361,6 +446,7 @@ export function MembersPage({ role }) {
     setIsAddingMember(true);
     setAddStep(1);
     setIsStep3Confirmed(false);
+    clearPhotoState('');
     setForm((current) => ({
       ...emptyForm,
       family_id: current.family_id || selectedFamilyId,
@@ -370,11 +456,38 @@ export function MembersPage({ role }) {
     }));
   }, [location.search, selectedFamilyId]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const editMemberId = params.get('edit_member_id');
+
+    if (!editMemberId) {
+      return;
+    }
+
+    const target = members.find((member) => String(member.id) === String(editMemberId));
+    if (!target) {
+      return;
+    }
+
+    showEditMemberForm(target);
+  }, [location.search, members]);
+
+  useEffect(
+    () => () => {
+      if (photoObjectUrl) {
+        URL.revokeObjectURL(photoObjectUrl);
+      }
+    },
+    [photoObjectUrl],
+  );
+
   function hideAddMemberForm() {
     setError('');
     setForm({ ...emptyForm, family_id: selectedFamilyId });
     setAddStep(1);
     setIsStep3Confirmed(false);
+    clearPhotoState('');
+    stopCamera();
     setEditingMember(null);
     setIsAddingMember(false);
   }
@@ -383,9 +496,11 @@ export function MembersPage({ role }) {
     setError('');
     setSuccess('');
     setEditingMember(member);
+    stopCamera();
     setAddStep(1);
     setIsStep3Confirmed(false);
     setIsAddingMember(false);
+    clearPhotoState(member.photo_url ?? '');
     setForm({
       ...emptyForm,
       family_id: String(member.display_family_id ?? member.family_id ?? selectedFamilyId),
@@ -394,6 +509,7 @@ export function MembersPage({ role }) {
       last_name: member.last_name ?? '',
       gender: member.gender ?? '',
       birth_date: member.birth_date ?? '',
+      birth_time: member.birth_time ?? '',
       death_date: member.death_date ?? '',
       graveyard_location: member.graveyard_location ?? '',
       email: member.email ?? '',
@@ -582,7 +698,8 @@ export function MembersPage({ role }) {
                         [1, 'Input'],
                         [2, 'Review'],
                         [3, 'Contact'],
-                        [4, 'Done'],
+                        [4, 'Photo'],
+                        [5, 'Done'],
                       ].map(([step, label]) => (
                         <button
                           className={addStep === step ? 'active' : ''}
@@ -672,17 +789,11 @@ export function MembersPage({ role }) {
               {(isEditingMember || addStep === 2) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
                 <>
                   <Input
-                    label="First name"
+                    label="Full name"
                     leftIcon={<UserRound aria-hidden="true" size={18} />}
                     value={form.first_name}
                     onChange={(event) => updateForm('first_name', event.target.value)}
                     required
-                    fullWidth
-                  />
-                  <Input
-                    label="Last name"
-                    value={form.last_name}
-                    onChange={(event) => updateForm('last_name', event.target.value)}
                     fullWidth
                   />
                   <Input
@@ -693,16 +804,27 @@ export function MembersPage({ role }) {
                     onChange={(event) => updateForm('birth_date', event.target.value)}
                     fullWidth
                   />
-                  <label className="field-group">
-                    Gender
-                    <select value={form.gender} onChange={(event) => updateForm('gender', event.target.value)}>
-                      <option value="">Select gender</option>
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                      <option value="non_binary">Non-binary</option>
-                      <option value="prefer_not_to_say">Prefer not to say</option>
-                    </select>
-                  </label>
+                  <Input
+                    label="Birth time"
+                    leftIcon={<Clock3 aria-hidden="true" size={18} />}
+                    type="time"
+                    value={form.birth_time}
+                    onChange={(event) => updateForm('birth_time', event.target.value)}
+                    fullWidth
+                  />
+                  <TextField
+                    fullWidth
+                    label="Gender"
+                    onChange={(event) => updateForm('gender', event.target.value)}
+                    select
+                    value={form.gender}
+                  >
+                    <MenuItem value="">Select gender</MenuItem>
+                    <MenuItem value="male">Male</MenuItem>
+                    <MenuItem value="female">Female</MenuItem>
+                    <MenuItem value="non_binary">Non-binary</MenuItem>
+                    <MenuItem value="prefer_not_to_say">Prefer not to say</MenuItem>
+                  </TextField>
                 </>
               ) : null}
 
@@ -741,6 +863,76 @@ export function MembersPage({ role }) {
               ) : null}
 
               {(isEditingMember || addStep === 4) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
+                <div className="member-form-wide member-photo-section">
+                  <div className="member-photo-preview">
+                    {photoPreviewUrl ? (
+                      <img alt="Member preview" src={photoPreviewUrl} />
+                    ) : (
+                      <Network aria-hidden="true" size={26} />
+                    )}
+                  </div>
+                  <div className="member-photo-actions">
+                    <label className="field-group">
+                      Upload Photo
+                      <input
+                        accept="image/*"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          clearPhotoState(editingMember?.photo_url ?? '');
+                          if (!file) {
+                            return;
+                          }
+                          const nextObjectUrl = URL.createObjectURL(file);
+                          setPhotoObjectUrl(nextObjectUrl);
+                          setPhotoFile(file);
+                          setPhotoPreviewUrl(nextObjectUrl);
+                        }}
+                        type="file"
+                      />
+                    </label>
+                    <label className="field-group">
+                      Take Picture (Mobile)
+                      <input
+                        accept="image/*"
+                        capture="environment"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          clearPhotoState(editingMember?.photo_url ?? '');
+                          if (!file) {
+                            return;
+                          }
+                          const nextObjectUrl = URL.createObjectURL(file);
+                          setPhotoObjectUrl(nextObjectUrl);
+                          setPhotoFile(file);
+                          setPhotoPreviewUrl(nextObjectUrl);
+                        }}
+                        type="file"
+                      />
+                    </label>
+                    <div className="member-photo-camera">
+                      <Button onClick={openCamera} type="button" variant="outline">
+                        Open Camera
+                      </Button>
+                      {cameraError ? <small>{cameraError}</small> : null}
+                      {isCameraOpen ? (
+                        <div className="member-camera-panel">
+                          <video autoPlay playsInline ref={videoRef} />
+                          <div className="member-camera-actions">
+                            <Button onClick={captureFromCamera} type="button">Capture</Button>
+                            <Button onClick={stopCamera} type="button" variant="outline">Cancel</Button>
+                          </div>
+                        </div>
+                      ) : null}
+                      <canvas ref={canvasRef} style={{ display: 'none' }} />
+                    </div>
+                    <small>
+                      Upload an image file or capture from camera. Recommended square photo up to 5MB.
+                    </small>
+                  </div>
+                </div>
+              ) : null}
+
+              {(isEditingMember || addStep === 5) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
                 <>
                   <label className="field-group member-form-wide">
                     Married / Unmarried
@@ -821,8 +1013,8 @@ export function MembersPage({ role }) {
                       Back
                     </Button>
                   ) : <span />}
-                  {addStep < 4 ? (
-                    <Button disabled={!canProceedStep(addStep)} onClick={() => setAddStep((current) => Math.min(4, current + 1))} type="button">
+                  {addStep < 5 ? (
+                    <Button disabled={!canProceedStep(addStep)} onClick={() => setAddStep((current) => Math.min(5, current + 1))} type="button">
                       Next
                     </Button>
                   ) : (
@@ -1006,4 +1198,28 @@ function createMemberSuccessMessage(result) {
 
 function relationshipLabel(value) {
   return relationshipOptions.find(([optionValue]) => optionValue === value)?.[1] ?? value;
+}
+
+function buildMemberRequestPayload(payload, photoFile) {
+  if (!photoFile) {
+    return payload;
+  }
+
+  const formData = new FormData();
+
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === null || value === undefined || value === '') {
+      return;
+    }
+
+    if (typeof value === 'boolean') {
+      formData.append(key, value ? '1' : '0');
+      return;
+    }
+
+    formData.append(key, String(value));
+  });
+
+  formData.append('photo', photoFile);
+  return formData;
 }

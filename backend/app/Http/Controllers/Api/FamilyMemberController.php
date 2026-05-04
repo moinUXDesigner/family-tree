@@ -60,6 +60,10 @@ class FamilyMemberController extends Controller
     {
         try {
             $data = $this->validatedMemberData($request);
+            $uploadedPhotoPath = $this->persistPhotoUpload($request);
+            if ($uploadedPhotoPath) {
+                $data['photo_path'] = $uploadedPhotoPath;
+            }
             $family = $this->accessibleFamily($request, (int) $data['family_id'], false);
             $this->ensureUserCanAddMemberType($request->user(), $data['add_member_type'] ?? null);
             $addMemberType = $data['add_member_type'] ?? null;
@@ -98,15 +102,38 @@ class FamilyMemberController extends Controller
 
     public function update(Request $request, FamilyMember $familyMember): JsonResponse
     {
-        $this->ensureMemberAccess($request, $familyMember, true);
+        $user = $request->user();
+        $isSelfEditableMember = $user->hasRole(User::ROLE_USER)
+            && (
+                ($familyMember->user_id && (int) $familyMember->user_id === (int) $user->id)
+                || (
+                    $familyMember->email
+                    && $user->email
+                    && Str::lower((string) $familyMember->email) === Str::lower((string) $user->email)
+                )
+            );
+
+        if (! $isSelfEditableMember) {
+            $this->ensureMemberAccess($request, $familyMember, true);
+        } else {
+            $this->ensureMemberAccess($request, $familyMember, false);
+        }
 
         $data = $this->validatedMemberData($request, $familyMember);
-        $family = $this->accessibleFamily($request, (int) $data['family_id'], true);
+        $uploadedPhotoPath = $this->persistPhotoUpload($request, $familyMember);
+        if ($uploadedPhotoPath) {
+            $data['photo_path'] = $uploadedPhotoPath;
+        }
 
-        $familyMember->update([
-            ...$this->memberFields($data),
-            'family_id' => $family->id,
-        ]);
+        if ($isSelfEditableMember) {
+            $familyMember->update($this->selfEditableMemberFields($data));
+        } else {
+            $family = $this->accessibleFamily($request, (int) $data['family_id'], true);
+            $familyMember->update([
+                ...$this->memberFields($data),
+                'family_id' => $family->id,
+            ]);
+        }
 
         return response()->json([
             'status' => true,
@@ -186,7 +213,9 @@ class FamilyMemberController extends Controller
             'last_name' => ['nullable', 'string', 'max:255'],
             'gender' => ['nullable', 'string', 'max:32'],
             'birth_date' => ['nullable', 'date'],
+            'birth_time' => ['nullable', 'date_format:H:i'],
             'death_date' => ['nullable', 'date', 'after_or_equal:birth_date'],
+            'photo' => ['nullable', 'image', 'max:5120'],
             'photo_path' => ['nullable', 'string', 'max:2048'],
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
@@ -266,6 +295,10 @@ class FamilyMemberController extends Controller
             } elseif ($value === null && $request->has($field)) {
                 $normalized[$field] = null;
             }
+        }
+
+        if ($request->has('birth_time')) {
+            $normalized['birth_time'] = $this->blankToNull($request->input('birth_time'));
         }
 
         foreach (['family_head_id', 'existing_person_id', 'household_id'] as $integerField) {
@@ -361,6 +394,7 @@ class FamilyMemberController extends Controller
             'last_name',
             'gender',
             'birth_date',
+            'birth_time',
             'death_date',
             'graveyard_location',
             'photo_path',
@@ -797,8 +831,10 @@ class FamilyMemberController extends Controller
         return collect([
             'gender',
             'birth_date',
+            'birth_time',
             'death_date',
             'graveyard_location',
+            'photo_path',
             'email',
             'phone',
             'current_city',
@@ -810,6 +846,53 @@ class FamilyMemberController extends Controller
             ->filter(fn (string $field): bool => blank($member->{$field}) && array_key_exists($field, $data))
             ->mapWithKeys(fn (string $field): array => [$field => $data[$field]])
             ->all();
+    }
+
+    private function persistPhotoUpload(Request $request, ?FamilyMember $existingMember = null): ?string
+    {
+        if (! $request->hasFile('photo')) {
+            return null;
+        }
+
+        $photo = $request->file('photo');
+
+        if (! $photo || ! $photo->isValid()) {
+            throw ValidationException::withMessages([
+                'photo' => ['Uploaded photo is invalid. Please try again.'],
+            ]);
+        }
+
+        $path = $photo->store('family-members', 'user_photos');
+
+        if ($existingMember?->photo_path && $existingMember->photo_path !== $path) {
+            Storage::disk('user_photos')->delete($existingMember->photo_path);
+        }
+
+        return $path;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function selfEditableMemberFields(array $data): array
+    {
+        return collect($this->memberFields($data))->only([
+            'first_name',
+            'last_name',
+            'gender',
+            'birth_date',
+            'birth_time',
+            'death_date',
+            'graveyard_location',
+            'photo_path',
+            'email',
+            'phone',
+            'current_city',
+            'current_country',
+            'marital_status',
+            'is_living',
+        ])->all();
     }
 
     /**
@@ -1269,6 +1352,7 @@ class FamilyMemberController extends Controller
             'display_name' => trim("{$member->first_name} {$member->last_name}"),
             'gender' => $member->gender,
             'birth_date' => $member->birth_date?->format('Y-m-d'),
+            'birth_time' => $member->birth_time,
             'death_date' => $member->death_date?->format('Y-m-d'),
             'photo_path' => $member->photo_path,
             'photo_url' => $member->photo_path ? Storage::disk('user_photos')->url($member->photo_path) : null,

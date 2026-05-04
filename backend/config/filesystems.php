@@ -49,8 +49,8 @@ return [
 
         'user_photos' => [
             'driver' => 'local',
-            'root' => storage_path('app/private/user-uploads/photos'),
-            'serve' => true,
+            'root' => storage_path('app/public/user-photos'),
+            'visibility' => 'public',
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage/user-photos',
             'throw' => false,
             'report' => false,

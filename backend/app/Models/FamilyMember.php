@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'last_name',
     'gender',
     'birth_date',
+    'birth_time',
     'death_date',
     'photo_path',
     'email',

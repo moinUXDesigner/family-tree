@@ -291,6 +291,13 @@ p {
   border-radius: 50%;
   background: #e3f2fd;
   color: #0b57d0;
+  overflow: hidden;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .profile-header h2 {
@@ -331,6 +338,44 @@ p {
 
 .profile-actions {
   margin-top: 20px;
+}
+
+.profile-member-shell {
+  margin-top: 20px;
+}
+
+.profile-member-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.profile-member-title-row h3 {
+  margin: 0;
+}
+
+.profile-member-empty {
+  margin: 0;
+  color: #64748b;
+}
+
+.profile-member-steps {
+  display: grid;
+  gap: 12px;
+}
+
+.profile-member-step {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.profile-member-step h4 {
+  margin: 0 0 10px;
+  color: #1e293b;
 }
 
 .password-success-page {
@@ -808,6 +853,68 @@ p {
   line-height: 1.4;
 }
 
+.member-photo-section {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.member-photo-preview {
+  display: grid;
+  width: 140px;
+  height: 140px;
+  place-items: center;
+  border: 1px solid #dce2ea;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #64748b;
+  overflow: hidden;
+}
+
+.member-photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.member-photo-actions {
+  display: grid;
+  gap: 12px;
+}
+
+.member-photo-camera {
+  display: grid;
+  gap: 8px;
+}
+
+.member-camera-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.member-camera-panel video {
+  width: min(100%, 320px);
+  border: 1px solid #dce2ea;
+  border-radius: 10px;
+  background: #000;
+}
+
+.member-camera-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .member-photo-section {
+    grid-template-columns: 1fr;
+  }
+
+  .member-photo-preview {
+    margin: 0 auto;
+  }
+}
+
 .member-list {
   display: grid;
   gap: 12px;
@@ -1181,6 +1288,13 @@ p {
   background: #dbeafe;
   color: #1d4ed8;
   font-weight: 900;
+  overflow: hidden;
+}
+
+.tree-person-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .tree-person-avatar.female {
@@ -3117,6 +3231,14 @@ p {
     font-size: 1.35rem;
     font-weight: 900;
     box-shadow: inset 0 1px 6px rgb(255 255 255 / 70%);
+    overflow: hidden;
+  }
+
+  .mobile-person-avatar img,
+  .mobile-row-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .mobile-person-avatar.female,
@@ -3228,6 +3350,7 @@ p {
     color: #0b63d8;
     font-size: 1rem;
     font-weight: 900;
+    overflow: hidden;
   }
 
   .mobile-person-row span:nth-child(2) {

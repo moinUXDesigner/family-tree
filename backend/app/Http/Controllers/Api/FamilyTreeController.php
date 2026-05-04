@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -229,7 +230,9 @@ class FamilyTreeController extends Controller
             'last_name' => $member->last_name,
             'gender' => $member->gender,
             'birth_date' => $member->birth_date?->format('Y-m-d'),
+            'birth_time' => $member->birth_time,
             'death_date' => $member->death_date?->format('Y-m-d'),
+            'photo_url' => $member->photo_path ? Storage::disk('user_photos')->url($member->photo_path) : null,
             'is_living' => $member->is_living,
             'family_head_id' => $member->family_head_id,
             'relation_to_family_head' => $member->relation_to_family_head,

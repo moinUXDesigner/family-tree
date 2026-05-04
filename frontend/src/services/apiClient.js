@@ -63,6 +63,13 @@ export const apiClient = {
       token,
     });
   },
+  putForm(path, body, token) {
+    return request(path, {
+      method: 'PUT',
+      body,
+      token,
+    });
+  },
   delete(path, token) {
     return request(path, {
       method: 'DELETE',
