@@ -47,4 +47,11 @@ export const familyApi = {
   async deleteMember(token, memberId) {
     await apiClient.delete(`/family-members/${memberId}`, token);
   },
+
+  async updateMemberPhoto(token, memberId, photoFile) {
+    const formData = new FormData();
+    formData.append('photo', photoFile);
+    const response = await apiClient.postForm(`/family-members/${memberId}/photo`, formData, token);
+    return response.data.member;
+  },
 };

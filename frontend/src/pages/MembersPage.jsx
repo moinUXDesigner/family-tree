@@ -19,6 +19,7 @@ import {
   UserRound,
   UsersRound,
   X,
+  Upload,
 } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLE_HOME, ROLE_LABELS, ROLES } from '../config/roles.js';
@@ -124,6 +125,7 @@ export function MembersPage({ role }) {
 
   const canDeleteMembers = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
   const canEditMembers = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
+  const canUploadMemberPhotos = Boolean(token);
   const isMemberFormOpen = isAddingMember || Boolean(editingMember);
   const isEditingMember = Boolean(editingMember);
   const isViewingMember = Boolean(viewingMember);
@@ -338,6 +340,23 @@ export function MembersPage({ role }) {
 
   function updateForm(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleMemberPhotoUpload(memberId, file) {
+    if (!file) {
+      return;
+    }
+
+    setError('');
+    setSuccess('');
+
+    try {
+      const updated = await familyApi.updateMemberPhoto(token, memberId, file);
+      setMembers((current) => current.map((item) => (item.id === updated.id ? updated : item)).sort(sortMembers));
+      setSuccess('Profile photo updated.');
+    } catch (uploadError) {
+      setError(uploadError.message);
+    }
   }
 
   function clearPhotoState(nextPreview = '') {
@@ -1106,6 +1125,23 @@ export function MembersPage({ role }) {
                   </small>
                 </div>
                 <div className="member-meta">
+                  {canUploadMemberPhotos ? (
+                    <label className="text-action" htmlFor={`member-photo-${member.id}`}>
+                      <Upload aria-hidden="true" size={16} />
+                      Upload Photo
+                      <input
+                        accept="image/*"
+                        id={`member-photo-${member.id}`}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          void handleMemberPhotoUpload(member.id, file);
+                          event.target.value = '';
+                        }}
+                        style={{ display: 'none' }}
+                        type="file"
+                      />
+                    </label>
+                  ) : null}
                   {canEditMembers ? (
                     <button
                       className="text-action"

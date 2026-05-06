@@ -150,6 +150,40 @@ class FamilyMemberController extends Controller
         ]);
     }
 
+    public function updatePhoto(Request $request, FamilyMember $familyMember): JsonResponse
+    {
+        $this->ensureMemberAccess($request, $familyMember, false);
+
+        $request->validate([
+            'photo' => ['required', 'image', 'max:5120'],
+        ]);
+
+        $uploadedPhotoPath = $this->persistPhotoUpload($request, $familyMember);
+
+        if (! $uploadedPhotoPath) {
+            throw ValidationException::withMessages([
+                'photo' => ['Uploaded photo is invalid. Please try again.'],
+            ]);
+        }
+
+        $familyMember->update([
+            'photo_path' => $uploadedPhotoPath,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Family member photo updated.',
+            'data' => [
+                'member' => $this->memberPayload($familyMember->refresh()->load([
+                    'creator:id,name,email',
+                    'family:id,name',
+                    'familyHead:id,first_name,last_name,marital_status',
+                    'user:id,name,email',
+                ])),
+            ],
+        ]);
+    }
+
     public function destroy(Request $request, FamilyMember $familyMember): JsonResponse
     {
         $this->ensureMemberAccess($request, $familyMember, true);
