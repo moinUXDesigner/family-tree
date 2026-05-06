@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\AuditTrailLogger;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,7 +36,7 @@ class AuthController extends Controller
             'is_active' => true,
         ]);
 
-        return response()->json([
+        $response = response()->json([
             'status' => true,
             'message' => 'Registered successfully.',
             'data' => [
@@ -43,6 +44,10 @@ class AuthController extends Controller
                 'token' => $user->createToken('web')->plainTextToken,
             ],
         ], 201);
+
+        AuditTrailLogger::logRequest($request, $response, $user, 'AUTH register');
+
+        return $response;
     }
 
     public function login(Request $request): JsonResponse
@@ -68,7 +73,7 @@ class AuthController extends Controller
 
         $user->tokens()->delete();
 
-        return response()->json([
+        $response = response()->json([
             'status' => true,
             'message' => 'Logged in successfully.',
             'data' => [
@@ -76,6 +81,10 @@ class AuthController extends Controller
                 'token' => $user->createToken('web')->plainTextToken,
             ],
         ]);
+
+        AuditTrailLogger::logRequest($request, $response, $user, 'AUTH login');
+
+        return $response;
     }
 
     public function forgotPassword(Request $request): JsonResponse
@@ -94,11 +103,15 @@ class AuthController extends Controller
             ]);
         }
 
-        return response()->json([
+        $response = response()->json([
             'status' => true,
             'message' => 'If the email exists in our system, a reset link has been sent.',
             'data' => null,
         ]);
+
+        AuditTrailLogger::logRequest($request, $response, null, 'AUTH forgot-password');
+
+        return $response;
     }
 
     public function resetPassword(Request $request): JsonResponse
@@ -109,15 +122,17 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
+        $auditedUser = null;
         $status = Password::reset(
             $data,
-            function (User $user, string $password): void {
+            function (User $user, string $password) use (&$auditedUser): void {
                 $user->forceFill([
                     'password' => $password,
                     'remember_token' => Str::random(60),
                 ])->save();
 
                 $user->tokens()->delete();
+                $auditedUser = $user;
 
                 event(new PasswordReset($user));
             }
@@ -129,11 +144,15 @@ class AuthController extends Controller
             ]);
         }
 
-        return response()->json([
+        $response = response()->json([
             'status' => true,
             'message' => 'Password reset successfully.',
             'data' => null,
         ]);
+
+        AuditTrailLogger::logRequest($request, $response, $auditedUser, 'AUTH reset-password');
+
+        return $response;
     }
 
     public function changePassword(Request $request): JsonResponse

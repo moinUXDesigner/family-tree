@@ -22,6 +22,7 @@ import { RequireFamilyConnection } from './auth/RequireFamilyConnection.jsx';
 import { RequireRole } from './auth/RequireRole.jsx';
 import { ROLE_HOME, ROLES } from './config/roles.js';
 import { useAuth } from './auth/useAuth.js';
+import { AnalyticsTracker } from './analytics/googleAnalytics.js';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -40,58 +41,61 @@ function HomeRedirect() {
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/" element={<HomeRedirect />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/password-changed" element={<PasswordChangedPage />} />
+    <>
+      <AnalyticsTracker />
+      <Routes>
+        <Route path="/" element={<HomeRedirect />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/password-changed" element={<PasswordChangedPage />} />
 
-      <Route element={<RequireAuth />}>
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/change-password" element={<ChangePasswordPage />} />
+        <Route element={<RequireAuth />}>
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/change-password" element={<ChangePasswordPage />} />
 
-        <Route element={<RequireRole roles={[ROLES.SUPER_ADMIN]} />}>
-          <Route
-            path="/super-admin/dashboard"
-            element={<DashboardPage role={ROLES.SUPER_ADMIN} />}
-          />
-          <Route
-            path="/super-admin/members"
-            element={<MembersPage role={ROLES.SUPER_ADMIN} />}
-          />
-          <Route path="/super-admin/families" element={<FamiliesPage />} />
-          <Route path="/super-admin/approvals" element={<ApprovalsPage />} />
-          <Route path="/super-admin/users" element={<UsersPage />} />
-          <Route path="/super-admin/activity" element={<ActivityPage role={ROLES.SUPER_ADMIN} />} />
-          <Route path="/super-admin/root-family" element={<RootFamilyPage />} />
-          <Route path="/super-admin/tree" element={<TreePage role={ROLES.SUPER_ADMIN} />} />
-          <Route path="/super-admin/feedback" element={<FeedbackPage role={ROLES.SUPER_ADMIN} />} />
-          <Route path="/super-admin/feedbacks" element={<FeedbackInboxPage role={ROLES.SUPER_ADMIN} />} />
-        </Route>
+          <Route element={<RequireRole roles={[ROLES.SUPER_ADMIN]} />}>
+            <Route
+              path="/super-admin/dashboard"
+              element={<DashboardPage role={ROLES.SUPER_ADMIN} />}
+            />
+            <Route
+              path="/super-admin/members"
+              element={<MembersPage role={ROLES.SUPER_ADMIN} />}
+            />
+            <Route path="/super-admin/families" element={<FamiliesPage />} />
+            <Route path="/super-admin/approvals" element={<ApprovalsPage />} />
+            <Route path="/super-admin/users" element={<UsersPage />} />
+            <Route path="/super-admin/activity" element={<ActivityPage role={ROLES.SUPER_ADMIN} />} />
+            <Route path="/super-admin/root-family" element={<RootFamilyPage />} />
+            <Route path="/super-admin/tree" element={<TreePage role={ROLES.SUPER_ADMIN} />} />
+            <Route path="/super-admin/feedback" element={<FeedbackPage role={ROLES.SUPER_ADMIN} />} />
+            <Route path="/super-admin/feedbacks" element={<FeedbackInboxPage role={ROLES.SUPER_ADMIN} />} />
+          </Route>
 
-        <Route element={<RequireRole roles={[ROLES.ADMIN]} />}>
-          <Route path="/admin/dashboard" element={<DashboardPage role={ROLES.ADMIN} />} />
-          <Route path="/admin/members" element={<MembersPage role={ROLES.ADMIN} />} />
-          <Route path="/admin/activity" element={<ActivityPage role={ROLES.ADMIN} />} />
-          <Route path="/admin/tree" element={<TreePage role={ROLES.ADMIN} />} />
-          <Route path="/admin/feedback" element={<FeedbackPage role={ROLES.ADMIN} />} />
-          <Route path="/admin/feedbacks" element={<FeedbackInboxPage role={ROLES.ADMIN} />} />
-        </Route>
+          <Route element={<RequireRole roles={[ROLES.ADMIN]} />}>
+            <Route path="/admin/dashboard" element={<DashboardPage role={ROLES.ADMIN} />} />
+            <Route path="/admin/members" element={<MembersPage role={ROLES.ADMIN} />} />
+            <Route path="/admin/activity" element={<ActivityPage role={ROLES.ADMIN} />} />
+            <Route path="/admin/tree" element={<TreePage role={ROLES.ADMIN} />} />
+            <Route path="/admin/feedback" element={<FeedbackPage role={ROLES.ADMIN} />} />
+            <Route path="/admin/feedbacks" element={<FeedbackInboxPage role={ROLES.ADMIN} />} />
+          </Route>
 
-        <Route element={<RequireRole roles={[ROLES.USER]} />}>
-          <Route path="/app/connect" element={<FamilyConnectionPage />} />
-          <Route path="/app/feedback" element={<FeedbackPage role={ROLES.USER} />} />
-          <Route element={<RequireFamilyConnection />}>
-            <Route path="/app/dashboard" element={<DashboardPage role={ROLES.USER} />} />
-            <Route path="/app/members" element={<MembersPage role={ROLES.USER} />} />
-            <Route path="/app/tree" element={<TreePage role={ROLES.USER} />} />
+          <Route element={<RequireRole roles={[ROLES.USER]} />}>
+            <Route path="/app/connect" element={<FamilyConnectionPage />} />
+            <Route path="/app/feedback" element={<FeedbackPage role={ROLES.USER} />} />
+            <Route element={<RequireFamilyConnection />}>
+              <Route path="/app/dashboard" element={<DashboardPage role={ROLES.USER} />} />
+              <Route path="/app/members" element={<MembersPage role={ROLES.USER} />} />
+              <Route path="/app/tree" element={<TreePage role={ROLES.USER} />} />
+            </Route>
           </Route>
         </Route>
-      </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
 }

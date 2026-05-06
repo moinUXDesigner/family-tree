@@ -18,10 +18,9 @@ export function ActivityPage({ role }) {
     async function load() {
       try {
         const nextFamilies = await familyApi.listFamilies(token);
-        const nextFamilyId = nextFamilies[0]?.id ?? '';
         setFamilies(nextFamilies);
-        setFamilyId(String(nextFamilyId));
-        const rows = await activityApi.listActivities(token, role === ROLES.SUPER_ADMIN ? nextFamilyId : '');
+        setFamilyId('');
+        const rows = await activityApi.listActivities(token, '');
         setActivities(rows);
       } catch (loadError) {
         setError(loadError.message);
@@ -63,6 +62,7 @@ export function ActivityPage({ role }) {
             <label className="field-group tree-family-select">
               Family
               <select value={familyId} onChange={(event) => onFamilyChange(event.target.value)}>
+                <option value="">All</option>
                 {families.map((family) => (
                   <option key={family.id} value={family.id}>
                     {family.name}
@@ -98,4 +98,3 @@ export function ActivityPage({ role }) {
     </main>
   );
 }
-
