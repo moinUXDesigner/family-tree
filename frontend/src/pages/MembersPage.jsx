@@ -76,6 +76,8 @@ const addMemberTypeOptions = [
   ['existing_to_household', 'Add Existing Person to Household', false],
 ];
 
+const endUserAddMemberTypes = ['spouse', 'child', 'parent', 'sibling'];
+
 const relationshipOptions = [
   ['father', 'Father'],
   ['mother', 'Mother'],
@@ -129,10 +131,20 @@ export function MembersPage({ role }) {
   const isMemberFormOpen = isAddingMember || Boolean(editingMember);
   const isEditingMember = Boolean(editingMember);
   const isViewingMember = Boolean(viewingMember);
+  const isEndUserAddFlow = role === ROLES.USER && !isEditingMember;
+  const allowedAddMemberTypes = useMemo(
+    () => (role === ROLES.USER ? endUserAddMemberTypes : addMemberTypeOptions.map(([value]) => value)),
+    [role],
+  );
+
+  const addMemberTypeOptionsForRole = useMemo(
+    () => (role === ROLES.USER ? addMemberTypeOptions.filter(([value]) => endUserAddMemberTypes.includes(value)) : addMemberTypeOptions),
+    [role],
+  );
   const selectedFamilyId = form.family_id || directoryFamilyId || families[0]?.id || user.family_id || '';
   const canSubmitMemberForm = isEditingMember
     ? Boolean(selectedFamilyId && form.first_name)
-    : canSubmitAddMemberForm(selectedFamilyId, form) && isStep3Confirmed;
+    : canSubmitAddMemberForm(selectedFamilyId, form) && (isEndUserAddFlow ? true : isStep3Confirmed);
 
   const stats = useMemo(() => {
     const livingCount = members.filter((member) => member.is_living).length;
@@ -446,7 +458,14 @@ export function MembersPage({ role }) {
     setError('');
     setSuccess('');
     setEditingMember(null);
-    setForm({ ...emptyForm, family_id: selectedFamilyId });
+    setForm({
+      ...emptyForm,
+      family_id: selectedFamilyId,
+      add_member_type: allowedAddMemberTypes.includes(form.add_member_type)
+        ? form.add_member_type
+        : allowedAddMemberTypes[0],
+      marital_status: ['child', 'sibling'].includes(form.add_member_type) ? 'unmarried' : 'married',
+    });
     setAddStep(1);
     setIsStep3Confirmed(false);
     clearPhotoState('');
@@ -460,7 +479,7 @@ export function MembersPage({ role }) {
     }
 
     const type = params.get('type') ?? 'spouse';
-    const addType = ['spouse', 'child', 'parent', 'sibling', 'existing_to_household'].includes(type) ? type : 'spouse';
+    const addType = allowedAddMemberTypes.includes(type) ? type : allowedAddMemberTypes[0] || 'spouse';
     const existingPersonId = params.get('existing_person_id') ?? '';
 
     setEditingMember(null);
@@ -475,7 +494,7 @@ export function MembersPage({ role }) {
       existing_person_id: needsExistingPerson(addType) ? existingPersonId : '',
       marital_status: ['child', 'sibling'].includes(addType) ? 'unmarried' : 'married',
     }));
-  }, [location.search, selectedFamilyId]);
+  }, [location.search, selectedFamilyId, allowedAddMemberTypes]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -545,6 +564,30 @@ export function MembersPage({ role }) {
   }
 
   function canProceedStep(step) {
+    if (isEndUserAddFlow) {
+      if (step === 1) {
+        return Boolean(form.add_member_type);
+      }
+
+      if (step === 2) {
+        if (needsExistingPerson(form.add_member_type) && !form.existing_person_id) {
+          return false;
+        }
+
+        if (needsHousehold(form.add_member_type) && !form.household_id) {
+          return false;
+        }
+
+        return true;
+      }
+
+      if (step === 3) {
+        return Boolean(form.first_name);
+      }
+
+      return true;
+    }
+
     if (step === 1) {
       if (!form.add_member_type) {
         return false;
@@ -721,101 +764,255 @@ export function MembersPage({ role }) {
 
               {!isEditingMember ? (
                 <>
-                  <div className="member-form-wide">
-                    <div className="members-stepper">
-                      {[
-                        [1, 'Input'],
-                        [2, 'Review'],
-                        [3, 'Contact'],
-                        [4, 'Photo'],
-                        [5, 'Done'],
-                      ].map(([step, label]) => (
-                        <button
-                          className={addStep === step ? 'active' : ''}
-                          key={step}
-                          disabled={!canOpenStep(step)}
-                          onClick={() => {
-                            if (canOpenStep(step)) {
-                              setAddStep(step);
-                            }
-                          }}
-                          type="button"
-                        >
-                          <span className="step-circle">{step}</span>
-                          <span className="step-label">{label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {addStep === 1 ? (
-                    <>
-                      <label className="field-group member-form-wide">
-                        Add Member Type
-                        <select
-                          value={form.add_member_type}
-                          onChange={(event) => updateAddMemberType(event.target.value)}
-                          required
-                        >
-                          {addMemberTypeOptions.map(([value, label, isDisabled]) => (
-                            <option disabled={isDisabled} key={value} value={value}>
-                              {label}
-                            </option>
+                  {isEndUserAddFlow ? (
+                    <div className="member-conversation">
+                      <div className="conversation-step">
+                        <p className="conversation-question">Who are they?</p>
+                        <div className="conversation-option-grid">
+                          {addMemberTypeOptionsForRole.map(([value, label]) => (
+                            <Button
+                              key={value}
+                              className={form.add_member_type === value ? 'conversation-option active' : 'conversation-option'}
+                              onClick={() => {
+                                updateAddMemberType(value);
+                                setAddStep(2);
+                              }}
+                              type="button"
+                              variant={form.add_member_type === value ? 'solid' : 'outline'}
+                            >
+                              {label.replace('Add ', '')}
+                            </Button>
                           ))}
-                        </select>
-                      </label>
+                        </div>
+                      </div>
 
-                      {needsExistingPerson(form.add_member_type) ? (
-                        <label className="field-group member-form-wide">
-                          Existing person
-                          <select
-                            value={form.existing_person_id}
-                            onChange={(event) => updateForm('existing_person_id', event.target.value)}
-                            required
-                          >
-                            <option value="">Select existing person</option>
-                            {members.map((member) => (
-                              <option key={member.id} value={member.id}>
-                                {member.display_name}
-                              </option>
-                            ))}
-                          </select>
-                          <small>
-                            {existingPersonHelpText(form.add_member_type)}
-                            {members.length === 0 ? ' No members are loaded for this family yet.' : ''}
-                          </small>
-                        </label>
+                      {addStep === 2 ? (
+                        <div className="conversation-step">
+                          <p className="conversation-question">
+                            {needsExistingPerson(form.add_member_type) ? 'Pick person' : 'Pick household'}
+                          </p>
+                          {needsExistingPerson(form.add_member_type) ? (
+                            <label className="field-group">
+                              Existing person
+                              <select
+                                value={form.existing_person_id}
+                                onChange={(event) => updateForm('existing_person_id', event.target.value)}
+                                required
+                              >
+                                <option value="">Select existing person</option>
+                                {members.map((member) => (
+                                  <option key={member.id} value={member.id}>
+                                    {member.display_name}
+                                  </option>
+                                ))}
+                              </select>
+                              <small>
+                                {existingPersonHelpText(form.add_member_type)}
+                                {members.length === 0 ? ' No members are loaded for this family yet.' : ''}
+                              </small>
+                            </label>
+                          ) : (
+                            <label className="field-group">
+                              Household
+                              <select
+                                value={form.household_id}
+                                onChange={(event) => updateForm('household_id', event.target.value)}
+                                required
+                              >
+                                <option value="">Select household</option>
+                                {households.map((household) => (
+                                  <option key={household.id} value={household.id}>
+                                    {household.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <small>
+                                Select the couple household this child belongs to.
+                                {households.length === 0 ? ' Add a spouse first to create a household.' : ''}
+                              </small>
+                            </label>
+                          )}
+                        </div>
                       ) : null}
 
-                      {needsHousehold(form.add_member_type) ? (
-                        <label className="field-group member-form-wide">
-                          Household / Couple Family
-                          <select
-                            value={form.household_id}
-                            onChange={(event) => updateForm('household_id', event.target.value)}
+                      {addStep === 3 ? (
+                        <div className="conversation-step">
+                          <p className="conversation-question">Member name</p>
+                          <Input
+                            label="First name"
+                            leftIcon={<UserRound aria-hidden="true" size={18} />}
+                            value={form.first_name}
+                            onChange={(event) => updateForm('first_name', event.target.value)}
                             required
+                            fullWidth
+                          />
+                          <Input
+                            label="Last name"
+                            leftIcon={<UserRound aria-hidden="true" size={18} />}
+                            value={form.last_name}
+                            onChange={(event) => updateForm('last_name', event.target.value)}
+                            fullWidth
+                          />
+                        </div>
+                      ) : null}
+
+                      {addStep === 4 ? (
+                        <div className="conversation-step">
+                          <p className="conversation-question">Confirm details</p>
+                          <div className="conversation-summary">
+                            <div>
+                              <strong>Relationship</strong>
+                              <p>{addMemberTypeOptionsForRole.find(([value]) => value === form.add_member_type)?.[1].replace('Add ', '')}</p>
+                            </div>
+                            {needsExistingPerson(form.add_member_type) ? (
+                              <div>
+                                <strong>Related person</strong>
+                                <p>
+                                  {members.find((member) => String(member.id) === String(form.existing_person_id))?.display_name || 'Not selected'}
+                                </p>
+                              </div>
+                            ) : null}
+                            {needsHousehold(form.add_member_type) ? (
+                              <div>
+                                <strong>Household</strong>
+                                <p>{households.find((household) => String(household.id) === String(form.household_id))?.name || 'Not selected'}</p>
+                              </div>
+                            ) : null}
+                            <div>
+                              <strong>Name</strong>
+                              <p>{form.first_name} {form.last_name}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="conversation-actions">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={addStep === 1}
+                          onClick={() => setAddStep((current) => Math.max(1, current - 1))}
+                        >
+                          Back
+                        </Button>
+                        {addStep < 4 ? (
+                          <Button
+                            type="button"
+                            disabled={!canProceedStep(addStep)}
+                            onClick={() => setAddStep((current) => Math.min(4, current + 1))}
                           >
-                            <option value="">Select household</option>
-                            {households.map((household) => (
-                              <option key={household.id} value={household.id}>
-                                {household.name}
-                              </option>
-                            ))}
-                          </select>
-                          <small>
-                            {form.add_member_type === 'existing_to_household'
-                              ? 'Select the household this existing person should be attached to.'
-                              : 'Select the couple household this child belongs to.'}
-                            {households.length === 0 ? ' Add a spouse first to create a household.' : ''}
-                          </small>
-                        </label>
+                            Next
+                          </Button>
+                        ) : (
+                          <Button
+                            type="submit"
+                            disabled={!canSubmitMemberForm || isSubmitting}
+                            isLoading={isSubmitting}
+                          >
+                            Add member
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="member-form-wide">
+                        <div className="members-stepper">
+                          {[
+                            [1, 'Input'],
+                            [2, 'Review'],
+                            [3, 'Contact'],
+                            [4, 'Photo'],
+                            [5, 'Done'],
+                          ].map(([step, label]) => (
+                            <button
+                              className={addStep === step ? 'active' : ''}
+                              key={step}
+                              disabled={!canOpenStep(step)}
+                              onClick={() => {
+                                if (canOpenStep(step)) {
+                                  setAddStep(step);
+                                }
+                              }}
+                              type="button"
+                            >
+                              <span className="step-circle">{step}</span>
+                              <span className="step-label">{label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {addStep === 1 ? (
+                        <>
+                          <label className="field-group member-form-wide">
+                            Add Member Type
+                            <select
+                              value={form.add_member_type}
+                              onChange={(event) => updateAddMemberType(event.target.value)}
+                              required
+                            >
+                              {addMemberTypeOptions.map(([value, label, isDisabled]) => (
+                                <option disabled={isDisabled} key={value} value={value}>
+                                  {label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          {needsExistingPerson(form.add_member_type) ? (
+                            <label className="field-group member-form-wide">
+                              Existing person
+                              <select
+                                value={form.existing_person_id}
+                                onChange={(event) => updateForm('existing_person_id', event.target.value)}
+                                required
+                              >
+                                <option value="">Select existing person</option>
+                                {members.map((member) => (
+                                  <option key={member.id} value={member.id}>
+                                    {member.display_name}
+                                  </option>
+                                ))}
+                              </select>
+                              <small>
+                                {existingPersonHelpText(form.add_member_type)}
+                                {members.length === 0 ? ' No members are loaded for this family yet.' : ''}
+                              </small>
+                            </label>
+                          ) : null}
+
+                          {needsHousehold(form.add_member_type) ? (
+                            <label className="field-group member-form-wide">
+                              Household / Couple Family
+                              <select
+                                value={form.household_id}
+                                onChange={(event) => updateForm('household_id', event.target.value)}
+                                required
+                              >
+                                <option value="">Select household</option>
+                                {households.map((household) => (
+                                  <option key={household.id} value={household.id}>
+                                    {household.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <small>
+                                {form.add_member_type === 'existing_to_household'
+                                  ? 'Select the household this existing person should be attached to.'
+                                  : 'Select the couple household this child belongs to.'}
+                                {households.length === 0 ? ' Add a spouse first to create a household.' : ''}
+                              </small>
+                            </label>
+                          ) : null}
+                        </>
                       ) : null}
                     </>
-                  ) : null}
+                  )}
                 </>
               ) : null}
 
-              {(isEditingMember || addStep === 2) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
+              {(!isEndUserAddFlow && (isEditingMember || addStep === 2)) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
                 <>
                   <Input
                     label="Full name"
@@ -857,7 +1054,7 @@ export function MembersPage({ role }) {
                 </>
               ) : null}
 
-              {(isEditingMember || addStep === 3) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
+              {(!isEndUserAddFlow && (isEditingMember || addStep === 3)) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
                 <>
                   <Input
                     label="Email"
@@ -891,7 +1088,7 @@ export function MembersPage({ role }) {
                 </>
               ) : null}
 
-              {(isEditingMember || addStep === 4) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
+              {(!isEndUserAddFlow && (isEditingMember || addStep === 4)) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
                 <div className="member-form-wide member-photo-section">
                   <div className="member-photo-preview">
                     {photoPreviewUrl ? (
@@ -961,7 +1158,7 @@ export function MembersPage({ role }) {
                 </div>
               ) : null}
 
-              {(isEditingMember || addStep === 5) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
+              {(!isEndUserAddFlow && (isEditingMember || addStep === 5)) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
                 <>
                   <label className="field-group member-form-wide">
                     Married / Unmarried
@@ -1035,7 +1232,7 @@ export function MembersPage({ role }) {
                 </>
               ) : null}
 
-              {!isEditingMember ? (
+              {!isEndUserAddFlow && !isEditingMember ? (
                 <div className="member-form-wide members-step-actions">
                   {isExistingToHouseholdFlow() ? (
                     <Button

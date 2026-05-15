@@ -3078,12 +3078,125 @@ p {
     grid-template-columns: 1fr;
   }
 
+  .member-form {
+    max-height: none;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .member-form .field-group {
+    min-width: 0;
+  }
+
   .member-fullscreen-grid {
     grid-template-columns: 1fr;
   }
 
   .member-form-action {
     justify-self: stretch;
+  }
+
+  .members-stepper {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .members-stepper button {
+    min-width: 0;
+    padding: 8px 10px;
+  }
+
+  .members-step-actions {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .member-conversation {
+    display: grid;
+    gap: 20px;
+  }
+
+  .conversation-step {
+    display: grid;
+    gap: 16px;
+    padding: 8px 0;
+  }
+
+  .conversation-question {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: rgba(0, 0, 0, 0.85);
+  }
+
+  .conversation-option-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .conversation-option {
+    min-height: 56px;
+    width: 100%;
+    padding: 16px 14px;
+    border-radius: 14px;
+    font-size: 0.95rem;
+    text-align: center;
+  }
+
+  .conversation-option.active {
+    background: #1976d2;
+    color: #ffffff;
+  }
+
+  .conversation-summary {
+    display: grid;
+    gap: 12px;
+    padding: 12px 0;
+  }
+
+  .conversation-summary div {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px;
+    background: #ffffff;
+  }
+
+  .conversation-summary strong {
+    display: block;
+    margin-bottom: 4px;
+    color: #374151;
+    font-size: 0.88rem;
+    font-weight: 700;
+  }
+
+  .conversation-summary p {
+    margin: 0;
+    color: rgba(0, 0, 0, 0.75);
+  }
+
+  .conversation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: space-between;
+  }
+
+  .conversation-actions button {
+    flex: 1 1 0;
+    min-width: 120px;
+  }
+
+  @media (max-width: 520px) {
+    .conversation-option-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .members-step-actions button,
+  .members-step-actions span {
+    min-width: 0;
   }
 
   .member-meta {
