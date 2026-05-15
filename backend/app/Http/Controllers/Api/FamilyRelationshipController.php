@@ -48,6 +48,7 @@ class FamilyRelationshipController extends Controller
         $data = $this->validatedRelationshipData($request);
         $family = $this->accessibleFamily($request, (int) $data['family_id'], true);
         $this->ensureMembersBelongToFamily($family, (int) $data['from_member_id'], (int) $data['to_member_id']);
+        $this->ensureRelationshipDoesNotExist($family, $data);
 
         $relationship = FamilyRelationship::query()->create([
             ...$data,
@@ -124,6 +125,33 @@ class FamilyRelationshipController extends Controller
         if ($memberCount !== 2) {
             throw ValidationException::withMessages([
                 'family_id' => ['Both members must belong to the selected family.'],
+            ]);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function ensureRelationshipDoesNotExist(Family $family, array $data): void
+    {
+        $query = FamilyRelationship::query()
+            ->where('family_id', $family->id)
+            ->where('relationship_type', $data['relationship_type'])
+            ->where(function (Builder $query) use ($data): void {
+                $query->where('from_member_id', $data['from_member_id'])
+                    ->where('to_member_id', $data['to_member_id']);
+            });
+
+        if ($data['relationship_type'] === FamilyRelationship::TYPE_SPOUSE) {
+            $query->orWhere(function (Builder $query) use ($data): void {
+                $query->where('from_member_id', $data['to_member_id'])
+                    ->where('to_member_id', $data['from_member_id']);
+            });
+        }
+
+        if ($query->exists()) {
+            throw ValidationException::withMessages([
+                'from_member_id' => ['This relationship already exists.'],
             ]);
         }
     }
