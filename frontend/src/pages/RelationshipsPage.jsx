@@ -55,6 +55,7 @@ export function RelationshipsPage({ role }) {
   const [members, setMembers] = useState([]);
   const [relationships, setRelationships] = useState([]);
   const [relationshipTypes, setRelationshipTypes] = useState(Object.keys(relationshipLabels));
+  const [selectedFamilyId, setSelectedFamilyId] = useState(user.family_id ?? '');
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -62,7 +63,7 @@ export function RelationshipsPage({ role }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canManageRelationships = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
-  const selectedFamilyId = form.family_id || families[0]?.id || user.family_id || '';
+  const effectiveFamilyId = selectedFamilyId || families[0]?.id || user.family_id || '';
 
   const stats = useMemo(() => {
     const parentLinks = relationships.filter((relationship) => relationship.relationship_type === 'parent').length;
@@ -85,9 +86,10 @@ export function RelationshipsPage({ role }) {
       try {
         const nextFamilies = await familyApi.listFamilies(token);
         const firstFamilyId = nextFamilies[0]?.id ?? user.family_id ?? '';
+        const resolvedFamilyId = selectedFamilyId || firstFamilyId;
         const [nextMembers, relationshipPayload] = await Promise.all([
-          familyApi.listMembers(token, firstFamilyId),
-          relationshipApi.listRelationships(token, firstFamilyId),
+          familyApi.listMembers(token, resolvedFamilyId),
+          relationshipApi.listRelationships(token, resolvedFamilyId),
         ]);
 
         if (!isMounted) {
@@ -95,12 +97,13 @@ export function RelationshipsPage({ role }) {
         }
 
         setFamilies(nextFamilies);
+        setSelectedFamilyId(resolvedFamilyId);
         setMembers(nextMembers);
         setRelationships(relationshipPayload.relationships);
         setRelationshipTypes(relationshipPayload.relationship_types ?? Object.keys(relationshipLabels));
         setForm((current) => ({
           ...current,
-          family_id: current.family_id || firstFamilyId,
+          family_id: current.family_id || resolvedFamilyId,
         }));
       } catch (loadError) {
         if (isMounted) {
@@ -118,7 +121,7 @@ export function RelationshipsPage({ role }) {
     return () => {
       isMounted = false;
     };
-  }, [token, user.family_id]);
+  }, [selectedFamilyId, token, user.family_id]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -129,7 +132,7 @@ export function RelationshipsPage({ role }) {
     try {
       const relationship = await relationshipApi.createRelationship(token, {
         ...form,
-        family_id: Number(selectedFamilyId),
+        family_id: Number(effectiveFamilyId),
         from_member_id: Number(form.from_member_id),
         to_member_id: Number(form.to_member_id),
       });
@@ -208,8 +211,12 @@ export function RelationshipsPage({ role }) {
                 <label className="field-group">
                   Family
                   <select
-                    value={form.family_id}
-                    onChange={(event) => updateForm('family_id', event.target.value)}
+                    value={effectiveFamilyId}
+                    onChange={(event) => {
+                      const nextFamilyId = event.target.value;
+                      setSelectedFamilyId(nextFamilyId);
+                      setForm((current) => ({ ...current, family_id: nextFamilyId }));
+                    }}
                     required
                   >
                     {families.map((family) => (
