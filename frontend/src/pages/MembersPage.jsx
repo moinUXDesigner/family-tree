@@ -144,7 +144,7 @@ export function MembersPage({ role }) {
   const selectedFamilyId = form.family_id || directoryFamilyId || families[0]?.id || user.family_id || '';
   const canSubmitMemberForm = isEditingMember
     ? Boolean(selectedFamilyId && form.first_name)
-    : canSubmitAddMemberForm(selectedFamilyId, form) && (isEndUserAddFlow ? true : isStep3Confirmed);
+    : canSubmitAddMemberForm(selectedFamilyId, form, isEndUserAddFlow) && (isEndUserAddFlow ? true : isStep3Confirmed);
 
   const stats = useMemo(() => {
     const livingCount = members.filter((member) => member.is_living).length;
@@ -603,19 +603,23 @@ export function MembersPage({ role }) {
       }
 
       if (step === 2) {
-        if (needsExistingPerson(form.add_member_type) && !form.existing_person_id) {
-          return false;
-        }
-
-        if (needsHousehold(form.add_member_type) && !form.household_id) {
-          return false;
-        }
-
-        return true;
+        return Boolean(form.first_name && form.gender);
       }
 
       if (step === 3) {
-        return Boolean(form.first_name);
+        return Boolean(form.birth_date);
+      }
+
+      if (step === 4) {
+        return Boolean(form.email && form.phone && form.current_city && form.current_country);
+      }
+
+      if (step === 5) {
+        return true;
+      }
+
+      if (step === 6) {
+        return Boolean(form.living_status && form.marital_status);
       }
 
       return true;
@@ -803,7 +807,7 @@ export function MembersPage({ role }) {
                   {isEndUserAddFlow ? (
                     <div className="member-conversation">
                       <div className="conversation-step">
-                        <p className="conversation-question">Who are they?</p>
+                        <p className="conversation-question">Select relationship</p>
                         <div className="conversation-option-grid">
                           {addMemberTypeOptionsForRole.map(([value, label]) => (
                             <Button
@@ -811,7 +815,7 @@ export function MembersPage({ role }) {
                               className={form.add_member_type === value ? 'conversation-option active' : 'conversation-option'}
                               onClick={() => {
                                 updateAddMemberType(value);
-                                setAddStep(2);
+                                setAddStep(1);
                               }}
                               type="button"
                               variant={form.add_member_type === value ? 'solid' : 'outline'}
@@ -822,71 +826,67 @@ export function MembersPage({ role }) {
                         </div>
                       </div>
 
-                      {addStep === 2 ? (
+                      {addStep === 1 ? (
                         <div className="conversation-step">
-                          <p className="conversation-question">
-                            {needsExistingPerson(form.add_member_type) ? 'Pick person' : 'Pick household'}
-                          </p>
-                          {needsExistingPerson(form.add_member_type) ? (
-                            <label className="field-group">
-                              Existing person
-                              <select
-                                value={form.existing_person_id}
-                                onChange={(event) => updateForm('existing_person_id', event.target.value)}
-                                required
-                              >
-                                <option value="">Select existing person</option>
-                                {members.map((member) => (
-                                  <option key={member.id} value={member.id}>
-                                    {member.display_name}
-                                  </option>
-                                ))}
-                              </select>
-                              <small>
-                                {existingPersonHelpText(form.add_member_type)}
-                                {members.length === 0 ? ' No members are loaded for this family yet.' : ''}
-                              </small>
-                            </label>
-                          ) : (
-                            <label className="field-group">
-                              Household
-                              <select
-                                value={form.household_id}
-                                onChange={(event) => updateForm('household_id', event.target.value)}
-                                required
-                              >
-                                <option value="">Select household</option>
-                                {households.map((household) => (
-                                  <option key={household.id} value={household.id}>
-                                    {household.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <small>
-                                Select the couple household this child belongs to.
-                                {households.length === 0 ? ' Add a spouse first to create a household.' : ''}
-                              </small>
-                            </label>
-                          )}
+                          <p className="conversation-question">Confirm the relationship</p>
+                          <div className="conversation-summary">
+                            <div>
+                              <strong>Relationship</strong>
+                              <p>{addMemberTypeOptionsForRole.find(([value]) => value === form.add_member_type)?.[1].replace('Add ', '')}</p>
+                            </div>
+                            <div>
+                              <strong>Related person</strong>
+                              <p>You (the logged-in user)</p>
+                            </div>
+                          </div>
                         </div>
                       ) : null}
 
-                      {addStep === 3 ? (
+                      {addStep === 2 ? (
                         <div className="conversation-step">
-                          <p className="conversation-question">Member name</p>
+                          <p className="conversation-question">Enter the member's full name and gender</p>
                           <Input
-                            label="First name"
+                            label="Full name"
                             leftIcon={<UserRound aria-hidden="true" size={18} />}
                             value={form.first_name}
                             onChange={(event) => updateForm('first_name', event.target.value)}
                             required
                             fullWidth
                           />
+                          <TextField
+                            fullWidth
+                            label="Gender"
+                            onChange={(event) => updateForm('gender', event.target.value)}
+                            select
+                            value={form.gender}
+                          >
+                            <MenuItem value="">Select gender</MenuItem>
+                            <MenuItem value="male">Male</MenuItem>
+                            <MenuItem value="female">Female</MenuItem>
+                            <MenuItem value="non_binary">Non-binary</MenuItem>
+                            <MenuItem value="prefer_not_to_say">Prefer not to say</MenuItem>
+                          </TextField>
+                        </div>
+                      ) : null}
+
+                      {addStep === 3 ? (
+                        <div className="conversation-step">
+                          <p className="conversation-question">Date of birth and time</p>
                           <Input
-                            label="Last name"
-                            leftIcon={<UserRound aria-hidden="true" size={18} />}
-                            value={form.last_name}
-                            onChange={(event) => updateForm('last_name', event.target.value)}
+                            label="Birth date"
+                            leftIcon={<CalendarDays aria-hidden="true" size={18} />}
+                            type="date"
+                            value={form.birth_date}
+                            onChange={(event) => updateForm('birth_date', event.target.value)}
+                            required
+                            fullWidth
+                          />
+                          <Input
+                            label="Birth time"
+                            leftIcon={<Clock3 aria-hidden="true" size={18} />}
+                            type="time"
+                            value={form.birth_time}
+                            onChange={(event) => updateForm('birth_time', event.target.value)}
                             fullWidth
                           />
                         </div>
@@ -894,29 +894,182 @@ export function MembersPage({ role }) {
 
                       {addStep === 4 ? (
                         <div className="conversation-step">
-                          <p className="conversation-question">Confirm details</p>
+                          <p className="conversation-question">Contact and location</p>
+                          <Input
+                            label="Email"
+                            leftIcon={<Mail aria-hidden="true" size={18} />}
+                            type="email"
+                            value={form.email}
+                            onChange={(event) => updateForm('email', event.target.value)}
+                            required
+                            fullWidth
+                          />
+                          <Input
+                            label="Phone"
+                            leftIcon={<Phone aria-hidden="true" size={18} />}
+                            value={form.phone}
+                            onChange={(event) => updateForm('phone', event.target.value)}
+                            required
+                            fullWidth
+                          />
+                          <Input
+                            label="City"
+                            leftIcon={<MapPin aria-hidden="true" size={18} />}
+                            value={form.current_city}
+                            onChange={(event) => updateForm('current_city', event.target.value)}
+                            required
+                            fullWidth
+                          />
+                          <Input
+                            label="Country"
+                            leftIcon={<Globe2 aria-hidden="true" size={18} />}
+                            value={form.current_country}
+                            onChange={(event) => updateForm('current_country', event.target.value)}
+                            required
+                            fullWidth
+                          />
+                          <small>Location selection placeholder; integrate Mapbox here if available.</small>
+                        </div>
+                      ) : null}
+
+                      {addStep === 5 ? (
+                        <div className="conversation-step">
+                          <p className="conversation-question">Upload photo and preview</p>
+                          <div className="member-photo-preview">
+                            {photoPreviewUrl ? (
+                              <img alt="Member preview" src={photoPreviewUrl} />
+                            ) : (
+                              <Network aria-hidden="true" size={26} />
+                            )}
+                          </div>
+                          <label className="field-group">
+                            Upload Photo
+                            <input
+                              accept="image/*"
+                              onChange={(event) => {
+                                const file = event.target.files?.[0] ?? null;
+                                clearPhotoState(editingMember?.photo_url ?? '');
+                                if (!file) {
+                                  return;
+                                }
+                                const nextObjectUrl = URL.createObjectURL(file);
+                                setPhotoObjectUrl(nextObjectUrl);
+                                setPhotoFile(file);
+                                setPhotoPreviewUrl(nextObjectUrl);
+                              }}
+                              type="file"
+                            />
+                          </label>
+                          <small>Preview appears above. Crop and adjust using your device before upload.</small>
+                        </div>
+                      ) : null}
+
+                      {addStep === 6 ? (
+                        <div className="conversation-step">
+                          <p className="conversation-question">Living and married status</p>
+                          <label className="field-group">
+                            Married status
+                            <select
+                              value={form.marital_status}
+                              onChange={(event) => updateForm('marital_status', event.target.value)}
+                              required
+                            >
+                              <option value="unmarried">Unmarried</option>
+                              <option value="married">Married</option>
+                            </select>
+                          </label>
+                          <label className="field-group">
+                            Living status
+                            <select
+                              value={form.living_status}
+                              onChange={(event) => {
+                                if (event.target.value === 'living') {
+                                  setForm((current) => ({
+                                    ...current,
+                                    living_status: 'living',
+                                    death_date: '',
+                                    graveyard_location: '',
+                                  }));
+                                  return;
+                                }
+
+                                updateForm('living_status', event.target.value);
+                              }}
+                              required
+                            >
+                              <option value="living">Living</option>
+                              <option value="deceased">Deceased</option>
+                            </select>
+                          </label>
+                          {form.living_status === 'deceased' ? (
+                            <>
+                              <Input
+                                label="Date of expiry"
+                                leftIcon={<CalendarDays aria-hidden="true" size={18} />}
+                                type="date"
+                                value={form.death_date}
+                                onChange={(event) => updateForm('death_date', event.target.value)}
+                                fullWidth
+                              />
+                              <Input
+                                label="Graveyard location"
+                                leftIcon={<MapPin aria-hidden="true" size={18} />}
+                                value={form.graveyard_location}
+                                onChange={(event) => updateForm('graveyard_location', event.target.value)}
+                                fullWidth
+                              />
+                            </>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {addStep === 7 ? (
+                        <div className="conversation-step">
+                          <p className="conversation-question">Review all details</p>
                           <div className="conversation-summary">
                             <div>
                               <strong>Relationship</strong>
                               <p>{addMemberTypeOptionsForRole.find(([value]) => value === form.add_member_type)?.[1].replace('Add ', '')}</p>
                             </div>
-                            {needsExistingPerson(form.add_member_type) ? (
-                              <div>
-                                <strong>Related person</strong>
-                                <p>
-                                  {members.find((member) => String(member.id) === String(form.existing_person_id))?.display_name || 'Not selected'}
-                                </p>
-                              </div>
-                            ) : null}
-                            {needsHousehold(form.add_member_type) ? (
-                              <div>
-                                <strong>Household</strong>
-                                <p>{households.find((household) => String(household.id) === String(form.household_id))?.name || 'Not selected'}</p>
-                              </div>
-                            ) : null}
                             <div>
-                              <strong>Name</strong>
-                              <p>{form.first_name} {form.last_name}</p>
+                              <strong>Full name</strong>
+                              <p>{form.first_name}</p>
+                            </div>
+                            <div>
+                              <strong>Gender</strong>
+                              <p>{form.gender || 'Not set'}</p>
+                            </div>
+                            <div>
+                              <strong>Date of birth</strong>
+                              <p>{form.birth_date || 'Not set'}</p>
+                            </div>
+                            <div>
+                              <strong>Birth time</strong>
+                              <p>{form.birth_time || 'Not set'}</p>
+                            </div>
+                            <div>
+                              <strong>Email</strong>
+                              <p>{form.email || 'Not set'}</p>
+                            </div>
+                            <div>
+                              <strong>Phone</strong>
+                              <p>{form.phone || 'Not set'}</p>
+                            </div>
+                            <div>
+                              <strong>Location</strong>
+                              <p>{[form.current_city, form.current_country].filter(Boolean).join(', ') || 'Not set'}</p>
+                            </div>
+                            <div>
+                              <strong>Photo</strong>
+                              <p>{photoPreviewUrl ? 'Uploaded' : 'No photo'}</p>
+                            </div>
+                            <div>
+                              <strong>Marital status</strong>
+                              <p>{form.marital_status}</p>
+                            </div>
+                            <div>
+                              <strong>Living status</strong>
+                              <p>{form.living_status === 'living' ? 'Living' : 'Deceased'}</p>
                             </div>
                           </div>
                         </div>
@@ -931,11 +1084,11 @@ export function MembersPage({ role }) {
                         >
                           Back
                         </Button>
-                        {addStep < 4 ? (
+                        {addStep < 7 ? (
                           <Button
                             type="button"
                             disabled={!canProceedStep(addStep)}
-                            onClick={() => setAddStep((current) => Math.min(4, current + 1))}
+                            onClick={() => setAddStep((current) => Math.min(7, current + 1))}
                           >
                             Next
                           </Button>
@@ -1440,7 +1593,7 @@ function sortMembers(first, second) {
   return first.display_name.localeCompare(second.display_name);
 }
 
-function canSubmitAddMemberForm(selectedFamilyId, form) {
+function canSubmitAddMemberForm(selectedFamilyId, form, ignoreHouseholdRequirement = false) {
   if (!selectedFamilyId || !canSubmitAddMemberType(form.add_member_type)) {
     return false;
   }
@@ -1453,7 +1606,7 @@ function canSubmitAddMemberForm(selectedFamilyId, form) {
     return false;
   }
 
-  if (needsHousehold(form.add_member_type) && !form.household_id) {
+  if (!ignoreHouseholdRequirement && needsHousehold(form.add_member_type) && !form.household_id) {
     return false;
   }
 
