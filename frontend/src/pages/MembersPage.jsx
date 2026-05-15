@@ -438,6 +438,8 @@ export function MembersPage({ role }) {
       last_name: value === 'existing_to_household' ? '' : current.last_name,
       marital_status: ['child', 'sibling'].includes(value) ? 'unmarried' : 'married',
     }));
+    setAddStep(1);
+    setIsStep3Confirmed(false);
   }
 
   function showAddMemberForm() {
@@ -570,7 +572,15 @@ export function MembersPage({ role }) {
     return true;
   }
 
+  function isExistingToHouseholdFlow() {
+    return !isEditingMember && form.add_member_type === 'existing_to_household';
+  }
+
   function canOpenStep(step) {
+    if (isExistingToHouseholdFlow()) {
+      return step === 1;
+    }
+
     if (isEditingMember) {
       return true;
     }
@@ -1027,16 +1037,7 @@ export function MembersPage({ role }) {
 
               {!isEditingMember ? (
                 <div className="member-form-wide members-step-actions">
-                  {addStep > 1 ? (
-                    <Button onClick={() => setAddStep((current) => Math.max(1, current - 1))} type="button" variant="outline">
-                      Back
-                    </Button>
-                  ) : <span />}
-                  {addStep < 5 ? (
-                    <Button disabled={!canProceedStep(addStep)} onClick={() => setAddStep((current) => Math.min(5, current + 1))} type="button">
-                      Next
-                    </Button>
-                  ) : (
+                  {isExistingToHouseholdFlow() ? (
                     <Button
                       className="member-form-action"
                       disabled={isSubmitting || !canSubmitMemberForm}
@@ -1046,6 +1047,29 @@ export function MembersPage({ role }) {
                       <Plus aria-hidden="true" />
                       Add member
                     </Button>
+                  ) : (
+                    <>
+                      {addStep > 1 ? (
+                        <Button onClick={() => setAddStep((current) => Math.max(1, current - 1))} type="button" variant="outline">
+                          Back
+                        </Button>
+                      ) : <span />}
+                      {addStep < 5 ? (
+                        <Button disabled={!canProceedStep(addStep)} onClick={() => setAddStep((current) => Math.min(5, current + 1))} type="button">
+                          Next
+                        </Button>
+                      ) : (
+                        <Button
+                          className="member-form-action"
+                          disabled={isSubmitting || !canSubmitMemberForm}
+                          isLoading={isSubmitting}
+                          type="submit"
+                        >
+                          <Plus aria-hidden="true" />
+                          Add member
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               ) : (
