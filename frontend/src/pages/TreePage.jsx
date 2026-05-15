@@ -63,8 +63,10 @@ export function TreePage({ role }) {
   );
 
   useEffect(() => {
-    setFocusMemberId(defaultFocusedMemberId(tree, user.id, familyHeadId));
-  }, [familyHeadId, tree, user.id]);
+    if (!focusMemberId || !nodeMap.has(focusMemberId)) {
+      setFocusMemberId(defaultFocusedMemberId(tree, user.id, familyHeadId));
+    }
+  }, [familyHeadId, focusMemberId, nodeMap, tree, user.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -93,7 +95,7 @@ export function TreePage({ role }) {
     return () => {
       isMounted = false;
     };
-  }, [selectedFamilyId, token, user.family_id]);
+  }, [token, user.family_id]);
 
   useEffect(() => {
     if (!selectedFamilyId) {
@@ -211,6 +213,10 @@ export function TreePage({ role }) {
                   <UsersRound aria-hidden="true" />
                   <strong>No members yet</strong>
                   <p>Add members and relationships to render a tree.</p>
+                  <Button component={Link} to={memberRoutes[role] ?? '/app/members'} type="button" variant="outline">
+                    <Plus aria-hidden="true" size={16} />
+                    Add member
+                  </Button>
                 </div>
               </div>
             ) : null}

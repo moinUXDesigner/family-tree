@@ -65,10 +65,35 @@ class FamilyTreeController extends Controller
         $family = Family::query()->findOrFail($familyId);
 
         if (! $user->hasRole(User::ROLE_SUPER_ADMIN)) {
-            abort_if($user->family_id !== $family->id, Response::HTTP_FORBIDDEN);
+            abort_if(
+                $user->family_id !== $family->id && ! $this->canAccessCanonicalFamilyFromLegacyBranch($request, $family),
+                Response::HTTP_FORBIDDEN,
+            );
         }
 
         return $family;
+    }
+
+    private function canAccessCanonicalFamilyFromLegacyBranch(Request $request, Family $family): bool
+    {
+        $user = $request->user();
+        $selectedFamilyId = (int) $request->input('_selected_family_id');
+
+        if (! $selectedFamilyId || $selectedFamilyId !== (int) $user->family_id) {
+            return false;
+        }
+
+        $selectedFamily = Family::query()->find($selectedFamilyId);
+        $head = $selectedFamily ? $this->legacyBranchHeadForFamily($selectedFamily) : null;
+
+        return $head?->family_id === $family->id;
+    }
+
+    private function legacyBranchHeadForFamily(Family $family): ?FamilyMember
+    {
+        return FamilyMember::query()
+            ->get(['id', 'family_id', 'first_name', 'last_name'])
+            ->first(fn (FamilyMember $member): bool => $this->legacyBranchFamilyMatchesMember($family, $member));
     }
 
     /**
