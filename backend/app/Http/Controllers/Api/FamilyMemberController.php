@@ -688,6 +688,8 @@ class FamilyMemberController extends Controller
             'marital_status' => $data['marital_status'] ?? 'married',
         ], $user, 'spouse', [$existingPerson->id]);
 
+        $this->ensureSpouseRelationshipDoesNotExist($family, $existingPerson, $member);
+
         $this->createFamilyRelationship(
             $family,
             $existingPerson->id,
@@ -1063,6 +1065,10 @@ class FamilyMemberController extends Controller
 
         if (! $type || $familyHead->id === $member->id) {
             return;
+        }
+
+        if ($type === FamilyRelationship::TYPE_SPOUSE) {
+            $this->ensureSpouseRelationshipDoesNotExist($family, $familyHead, $member);
         }
 
         [$fromMemberId, $toMemberId] = $this->relationshipDirection($familyHead, $member, $relationship);
