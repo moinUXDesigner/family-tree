@@ -113,7 +113,7 @@ export function MembersPage({ role }) {
   const [viewingMember, setViewingMember] = useState(null);
   const [directoryFamilyId, setDirectoryFamilyId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('name_asc');
+  const [sortBy, setSortBy] = useState('recent_first');
   const [addStep, setAddStep] = useState(1);
   const [isStep3Confirmed, setIsStep3Confirmed] = useState(false);
   const [photoFile, setPhotoFile] = useState(null);
@@ -174,6 +174,39 @@ export function MembersPage({ role }) {
       : [...members];
 
     return source.sort((a, b) => {
+      if (sortBy === 'recent_first') {
+        const aDate = a.created_at ? Date.parse(a.created_at) : null;
+        const bDate = b.created_at ? Date.parse(b.created_at) : null;
+
+        if (aDate && bDate) {
+          return bDate - aDate;
+        }
+
+        if (aDate) {
+          return -1;
+        }
+
+        if (bDate) {
+          return 1;
+        }
+
+        return Number(b.id) - Number(a.id);
+      }
+
+      if (sortBy === 'dob_oldest_first') {
+        const aDob = a.birth_date ? Date.parse(a.birth_date) : Infinity;
+        const bDob = b.birth_date ? Date.parse(b.birth_date) : Infinity;
+
+        return aDob - bDob || a.display_name.localeCompare(b.display_name);
+      }
+
+      if (sortBy === 'dob_newest_first') {
+        const aDob = a.birth_date ? Date.parse(a.birth_date) : -Infinity;
+        const bDob = b.birth_date ? Date.parse(b.birth_date) : -Infinity;
+
+        return bDob - aDob || a.display_name.localeCompare(b.display_name);
+      }
+
       if (sortBy === 'name_desc') {
         return b.display_name.localeCompare(a.display_name);
       }
@@ -693,8 +726,11 @@ export function MembersPage({ role }) {
             <label className="members-sort-control">
               <span className="sr-only">Sort members</span>
               <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+                <option value="recent_first">Recently added</option>
                 <option value="name_asc">Name A-Z</option>
                 <option value="name_desc">Name Z-A</option>
+                <option value="dob_oldest_first">DOB oldest first</option>
+                <option value="dob_newest_first">DOB newest first</option>
                 <option value="living_first">Living first</option>
                 <option value="deceased_first">Deceased first</option>
               </select>
