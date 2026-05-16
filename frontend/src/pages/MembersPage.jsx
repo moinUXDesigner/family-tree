@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { Alert as MuiAlert, Snackbar } from '@mui/material';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
+import Cropper from 'react-cropper';
+import 'cropperjs/dist/cropper.css';
 import {
   CalendarDays,
   Clock3,
@@ -18,6 +20,7 @@ import {
   Network,
   UserRound,
   UsersRound,
+  ArrowLeft,
   X,
   Upload,
 } from 'lucide-react';
@@ -45,6 +48,9 @@ const treeRoutes = {
   [ROLES.USER]: '/app/tree',
 };
 
+const DEFAULT_CITY = 'Kadapa';
+const DEFAULT_COUNTRY = 'India';
+
 const emptyForm = {
   family_id: '',
   tree_family_id: '',
@@ -60,8 +66,8 @@ const emptyForm = {
   graveyard_location: '',
   email: '',
   phone: '',
-  current_city: '',
-  current_country: '',
+  current_city: DEFAULT_CITY,
+  current_country: DEFAULT_COUNTRY,
   family_head_id: '',
   relationship_to_family_head: '',
   marital_status: 'married',
@@ -119,12 +125,23 @@ export function MembersPage({ role }) {
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState('');
   const [photoObjectUrl, setPhotoObjectUrl] = useState('');
+  const [croppedImageDataUrl, setCroppedImageDataUrl] = useState('');
+  const [cropSourceUrl, setCropSourceUrl] = useState('');
+  const [cropSourceObjectUrl, setCropSourceObjectUrl] = useState('');
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [cropError, setCropError] = useState('');
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [createdMember, setCreatedMember] = useState(null);
+  const [duplicateDecision, setDuplicateDecision] = useState('');
+  const [selectedExistingMemberId, setSelectedExistingMemberId] = useState('');
+  const [isDesktopViewport, setIsDesktopViewport] = useState(
+    typeof window === 'undefined' ? true : window.innerWidth >= 768,
+  );
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const cameraStreamRef = useRef(null);
+  const cropperRef = useRef(null);
 
   const canDeleteMembers = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
   const canEditMembers = role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
@@ -188,11 +205,39 @@ export function MembersPage({ role }) {
     [form, isEndUserAddFlow, linkedMemberId, resolvedHouseholdId],
   );
   const requiresStepConfirmation = !isEditingMember && !isEndUserAddFlow && form.add_member_type !== 'existing_to_household';
+  const selectedLinkedHousehold = useMemo(
+    () => linkedHouseholds.find((household) => String(household.id) === String(resolvedHouseholdId)) ?? null,
+    [linkedHouseholds, resolvedHouseholdId],
+  );
+  const relationScopedPossibleMatches = useMemo(() => {
+    if (!isEndUserAddFlow) {
+      return [];
+    }
+    if (!selectedLinkedHousehold) {
+      return [];
+    }
+    const relationBuckets = {
+      child: ['child', 'son', 'daughter'],
+      spouse: ['spouse', 'husband', 'wife'],
+      parent: ['parent', 'father', 'mother', 'guardian'],
+      sibling: ['sibling', 'brother', 'sister'],
+    };
+    const selectedRelations = relationBuckets[form.add_member_type] ?? [form.add_member_type];
+    return members.filter((member) => {
+      if (String(member.household_name || '').toLowerCase() !== String(selectedLinkedHousehold.name || '').toLowerCase()) {
+        return false;
+      }
+      const relation = String(member.relation_to_family_head || '').toLowerCase();
+      return selectedRelations.includes(relation);
+    });
+  }, [form.add_member_type, isEndUserAddFlow, members, selectedLinkedHousehold]);
+  const requiresDuplicateDecision = isEndUserAddFlow && relationScopedPossibleMatches.length > 0 && addStep >= 3;
+  const isDuplicateGatePassed = !requiresDuplicateDecision || duplicateDecision === 'continue_new' || duplicateDecision === 'use_existing';
   const canSubmitMemberForm = isEditingMember
-    ? Boolean(selectedFamilyId && form.first_name)
+    ? Boolean(selectedFamilyId && form.first_name && form.gender)
     : canSubmitAddMemberForm(selectedFamilyId, effectiveForm, {
       ignoreHouseholdRequirement: isEndUserAddFlow && form.add_member_type !== 'child',
-    }) && (!requiresStepConfirmation || isStep3Confirmed);
+    }) && (!requiresStepConfirmation || isStep3Confirmed) && isDuplicateGatePassed && duplicateDecision !== 'use_existing';
 
   const stats = useMemo(() => {
     const livingCount = members.filter((member) => member.is_living).length;
@@ -318,6 +363,14 @@ export function MembersPage({ role }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (requiresDuplicateDecision && !duplicateDecision) {
+      setError('Please choose either "Use Existing Member" or "Continue Adding New".');
+      return;
+    }
+    if (duplicateDecision === 'use_existing') {
+      setError('This member already exists. End users cannot attach existing members directly; ask admin to attach from Members, or use Tree quick actions.');
+      return;
+    }
     if (!canSubmitMemberForm) {
       setError('Please complete required fields before submitting.');
       return;
@@ -380,7 +433,7 @@ export function MembersPage({ role }) {
       // For end user flow, show success screen
       if (isEndUserAddFlow) {
         setCreatedMember(result);
-        setAddStep(9); // Success screen
+        setAddStep(10); // Success screen
       } else {
         setForm({ ...emptyForm, family_id: selectedFamilyId });
         clearPhotoState('');
@@ -482,6 +535,74 @@ export function MembersPage({ role }) {
     }
     setPhotoFile(null);
     setPhotoPreviewUrl(nextPreview);
+    setCroppedImageDataUrl(nextPreview || '');
+  }
+
+  function clearCropState() {
+    if (cropSourceObjectUrl) {
+      URL.revokeObjectURL(cropSourceObjectUrl);
+      setCropSourceObjectUrl('');
+    }
+    setCropSourceUrl('');
+    setIsCropModalOpen(false);
+    setCropError('');
+  }
+
+  function startPhotoCrop(file) {
+    if (!file) {
+      return;
+    }
+    clearCropState();
+    const sourceUrl = URL.createObjectURL(file);
+    setCropSourceObjectUrl(sourceUrl);
+    setCropSourceUrl(sourceUrl);
+    setIsCropModalOpen(true);
+    setCropError('');
+  }
+
+  function closeCropModal() {
+    clearCropState();
+  }
+
+  function updateLiveCropPreview() {
+    const cropper = cropperRef.current?.cropper;
+    if (!cropper) {
+      return;
+    }
+    const canvas = cropper.getCroppedCanvas();
+    if (!canvas) {
+      return;
+    }
+    setCroppedImageDataUrl(canvas.toDataURL('image/jpeg', 0.9));
+  }
+
+  async function applyPhotoCrop() {
+    const cropper = cropperRef.current?.cropper;
+    if (!cropper) {
+      return;
+    }
+
+    try {
+      const canvas = cropper.getCroppedCanvas();
+      if (!canvas) {
+        throw new Error('Could not prepare image crop.');
+      }
+      const base64Image = canvas.toDataURL('image/jpeg', 0.9);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+      if (!blob) {
+        throw new Error('Could not process cropped image.');
+      }
+      const croppedFile = new File([blob], `member-photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      clearPhotoState(editingMember?.photo_url ?? '');
+      const nextObjectUrl = URL.createObjectURL(croppedFile);
+      setPhotoObjectUrl(nextObjectUrl);
+      setPhotoFile(croppedFile);
+      setPhotoPreviewUrl(nextObjectUrl);
+      setCroppedImageDataUrl(base64Image);
+      clearCropState();
+    } catch (cropFailure) {
+      setCropError(cropFailure.message || 'Could not crop image.');
+    }
   }
 
   function stopCamera() {
@@ -536,10 +657,7 @@ export function MembersPage({ role }) {
       }
       clearPhotoState(editingMember?.photo_url ?? '');
       const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
-      const nextObjectUrl = URL.createObjectURL(file);
-      setPhotoObjectUrl(nextObjectUrl);
-      setPhotoFile(file);
-      setPhotoPreviewUrl(nextObjectUrl);
+      startPhotoCrop(file);
       stopCamera();
     }, 'image/jpeg', 0.9);
   }
@@ -556,6 +674,8 @@ export function MembersPage({ role }) {
     }));
     setAddStep(isEndUserAddFlow ? 2 : 1); // Skip to confirm for end users
     setIsStep3Confirmed(false);
+    setDuplicateDecision('');
+    setSelectedExistingMemberId('');
   }
 
   function showAddMemberForm() {
@@ -573,7 +693,10 @@ export function MembersPage({ role }) {
     setAddStep(isEndUserAddFlow ? 1 : 1); // End users start at relationship selection
     setIsStep3Confirmed(false);
     setCreatedMember(null);
+    setDuplicateDecision('');
+    setSelectedExistingMemberId('');
     clearPhotoState('');
+    clearCropState();
     setIsAddingMember(true);
   }
 
@@ -591,7 +714,10 @@ export function MembersPage({ role }) {
     setIsAddingMember(true);
     setAddStep(1);
     setIsStep3Confirmed(false);
+    setDuplicateDecision('');
+    setSelectedExistingMemberId('');
     clearPhotoState('');
+    clearCropState();
     setForm((current) => ({
       ...emptyForm,
       family_id: current.family_id || selectedFamilyId,
@@ -622,16 +748,28 @@ export function MembersPage({ role }) {
       if (photoObjectUrl) {
         URL.revokeObjectURL(photoObjectUrl);
       }
+      if (cropSourceObjectUrl) {
+        URL.revokeObjectURL(cropSourceObjectUrl);
+      }
     },
-    [photoObjectUrl],
+    [photoObjectUrl, cropSourceObjectUrl],
   );
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktopViewport(window.innerWidth >= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   function hideAddMemberForm() {
     setError('');
     setForm({ ...emptyForm, family_id: selectedFamilyId });
     setAddStep(1);
     setIsStep3Confirmed(false);
+    setDuplicateDecision('');
+    setSelectedExistingMemberId('');
     clearPhotoState('');
+    clearCropState();
     stopCamera();
     setEditingMember(null);
     setIsAddingMember(false);
@@ -645,8 +783,11 @@ export function MembersPage({ role }) {
     stopCamera();
     setAddStep(1);
     setIsStep3Confirmed(false);
+    setDuplicateDecision('');
+    setSelectedExistingMemberId('');
     setIsAddingMember(false);
     clearPhotoState(member.photo_url ?? '');
+    clearCropState();
     setForm({
       ...emptyForm,
       family_id: String(member.display_family_id ?? member.family_id ?? selectedFamilyId),
@@ -683,32 +824,36 @@ export function MembersPage({ role }) {
 
         return true; // Can always proceed
       }
-      // Screen 3: Basic Details (Name, Gender)
+      // Screen 3: Existing members in selected household + relation
       if (step === 3) {
+        return true;
+      }
+      // Screen 4: Basic Details (Name, Gender)
+      if (step === 4) {
         return Boolean(form.first_name && form.gender);
       }
-      // Screen 4: Birth Details (DOB, Birth Time)
-      if (step === 4) {
-        return Boolean(form.birth_date);
-      }
-      // Screen 5: Contact Details (Email, Phone, Location)
+      // Screen 5: Birth Details (DOB, Birth Time)
       if (step === 5) {
-        return Boolean(form.email && form.phone && form.current_city && form.current_country);
+        return true;
       }
-      // Screen 6: Photo Upload
+      // Screen 6: Contact Details (Email, Phone, Location)
       if (step === 6) {
+        return true;
+      }
+      // Screen 7: Photo Upload
+      if (step === 7) {
         return true; // Photo is optional
       }
-      // Screen 7: Status Details (Living, Married)
-      if (step === 7) {
+      // Screen 8: Status Details (Living, Married)
+      if (step === 8) {
         return Boolean(form.living_status && form.marital_status);
       }
-      // Screen 8: Review Screen
-      if (step === 8) {
+      // Screen 9: Review Screen
+      if (step === 9) {
         return true; // Can always review
       }
-      // Screen 9: Success Screen
-      if (step === 9) {
+      // Screen 10: Success Screen
+      if (step === 10) {
         return Boolean(createdMember);
       }
       return true;
@@ -735,7 +880,7 @@ export function MembersPage({ role }) {
         return true;
       }
 
-      return Boolean(form.first_name);
+      return Boolean(form.first_name && form.gender);
     }
 
     return true;
@@ -743,6 +888,21 @@ export function MembersPage({ role }) {
 
   function isExistingToHouseholdFlow() {
     return !isEditingMember && form.add_member_type === 'existing_to_household';
+  }
+
+  function useExistingMember(member) {
+    setSelectedExistingMemberId(String(member.id));
+    setDuplicateDecision('use_existing');
+    setError('');
+    setSuccess(`Skipped adding duplicate. ${member.display_name} already exists in ${selectedLinkedHousehold?.name || 'this household'}.`);
+    hideAddMemberForm();
+  }
+
+  function continueAddingNew() {
+    setSelectedExistingMemberId('');
+    setDuplicateDecision('continue_new');
+    setError('');
+    setSuccess('');
   }
 
   function canOpenStep(step) {
@@ -767,6 +927,15 @@ export function MembersPage({ role }) {
     return true;
   }
 
+  function handleEndUserMobileNav() {
+    if (addStep <= 1) {
+      hideAddMemberForm();
+      return;
+    }
+
+    setAddStep((current) => Math.max(1, current - 1));
+  }
+
   return (
     <main className="dashboard-page">
       <NavigationChrome active="members" role={role} />
@@ -781,6 +950,7 @@ export function MembersPage({ role }) {
                   className="members-desktop-add-btn"
                   onClick={showAddMemberForm}
                   type="button"
+                  style={{ display: isEndUserRole ? 'none' : undefined }}
                 >
                   <Plus aria-hidden="true" />
                   Add Member
@@ -805,6 +975,22 @@ export function MembersPage({ role }) {
             {success}
           </MuiAlert>
         </Snackbar>
+
+        {!isMemberFormOpen ? (
+          isEndUserRole ? (
+            <Card padding="md" variant="bordered">
+              <div className="section-heading">
+                <div>
+                  <h3>My Family Menu</h3>
+                </div>
+                <Button onClick={showAddMemberForm} type="button">
+                  <Plus aria-hidden="true" />
+                  Add Member
+                </Button>
+              </div>
+            </Card>
+          ) : null
+        ) : null}
 
         {!isMemberFormOpen ? (
           <div className="members-summary-row">
@@ -867,7 +1053,12 @@ export function MembersPage({ role }) {
               <div>
                 <h2>{isEditingMember ? 'Edit member' : 'Add member'}</h2>
               </div>
-              <Button onClick={hideAddMemberForm} type="button" variant="outline">
+              <Button
+                onClick={hideAddMemberForm}
+                type="button"
+                variant="outline"
+                style={{ display: isEndUserAddFlow && !isDesktopViewport ? 'none' : undefined }}
+              >
                 Cancel
               </Button>
             </div>
@@ -895,6 +1086,48 @@ export function MembersPage({ role }) {
                 <>
                   {isEndUserAddFlow ? (
                     <div className="member-add-flow-fullscreen">
+                      {!isDesktopViewport ? (
+                        <div
+                          style={{
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 20,
+                            background: 'var(--color-surface, #ffffff)',
+                            padding: '0.5rem 0',
+                            marginBottom: '0.5rem',
+                            borderBottom: '1px solid rgba(15, 23, 42, 0.12)',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '44px 1fr 44px',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                            }}
+                          >
+                            <button
+                              aria-label="Go back"
+                              className="text-action"
+                              onClick={handleEndUserMobileNav}
+                              style={{ minHeight: '44px', minWidth: '44px', justifySelf: 'start' }}
+                              type="button"
+                            >
+                              <ArrowLeft aria-hidden="true" size={18} />
+                            </button>
+                            <strong style={{ textAlign: 'center' }}>Add Member</strong>
+                            <button
+                              aria-label="Close add member flow"
+                              className="text-action"
+                              onClick={hideAddMemberForm}
+                              style={{ minHeight: '44px', minWidth: '44px', justifySelf: 'end' }}
+                              type="button"
+                            >
+                              <X aria-hidden="true" size={18} />
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
                       {/* Screen 1: Relationship Selection */}
                       {addStep === 1 && (
                         <div className="flow-screen flow-screen-1">
@@ -958,26 +1191,62 @@ export function MembersPage({ role }) {
                             ) : null}
                           </div>
                           <div className="flow-actions">
-                            <Button
-                              onClick={() => setAddStep(1)}
-                              variant="outline"
-                              fullWidth
-                            >
-                              Back
-                            </Button>
-                            <Button
-                              onClick={() => setAddStep(3)}
-                              fullWidth
-                            >
-                              Confirm
-                            </Button>
+                            {isDesktopViewport ? (
+                              <Button
+                                onClick={() => setAddStep(1)}
+                                variant="outline"
+                                fullWidth
+                              >
+                                Back
+                              </Button>
+                            ) : null}
+                            <Button onClick={() => setAddStep(3)} fullWidth>Confirm</Button>
                           </div>
                         </div>
                       )}
 
-                      {/* Screen 3: Basic Details (Name, Gender) */}
+                      {/* Screen 3: Existing members in selected household and relation */}
                       {addStep === 3 && (
                         <div className="flow-screen flow-screen-3">
+                          <h2>Existing {addMemberTypeOptionsForRole.find(([value]) => value === form.add_member_type)?.[1].replace('Add ', '')} members</h2>
+                          <div className="flow-confirmation">
+                            <div className="confirmation-item">
+                              <span className="label">Selected household:</span>
+                              <span className="value">{selectedLinkedHousehold?.name || 'No household selected'}</span>
+                            </div>
+                          </div>
+                          <div className="flow-inputs">
+                            {relationScopedPossibleMatches.length > 0 ? relationScopedPossibleMatches.map((member) => (
+                              <div className="review-item" key={member.id} style={{ display: 'grid', gridTemplateColumns: '40px 1fr auto', gap: '0.5rem', alignItems: 'center' }}>
+                                <div className="member-avatar" aria-hidden="true" style={{ width: '40px', height: '40px' }}>
+                                  {member.photo_url ? <img alt="" src={member.photo_url} /> : <Network aria-hidden="true" size={16} />}
+                                </div>
+                                <div>
+                                  <strong>{member.display_name}</strong>
+                                  <small style={{ display: 'block' }}>
+                                    {member.birth_date || 'DOB not set'} | {memberAge(member.birth_date)} | {relationshipLabel(member.relation_to_family_head || form.add_member_type)}
+                                  </small>
+                                </div>
+                                <Button onClick={() => useExistingMember(member)} type="button" variant="outline">Use Existing</Button>
+                              </div>
+                            )) : (
+                              <div className="review-item">
+                                <span className="label">No matching members found in this household for selected relationship.</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flow-actions">
+                            {isDesktopViewport ? (
+                              <Button onClick={() => setAddStep(2)} variant="outline" fullWidth>Back</Button>
+                            ) : null}
+                            <Button onClick={() => { continueAddingNew(); setAddStep(4); }} fullWidth>Continue Adding New</Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Screen 4: Basic Details (Name, Gender) */}
+                      {addStep === 4 && (
+                        <div className="flow-screen flow-screen-4">
                           <h2>Basic information</h2>
                           <div className="flow-inputs">
                             <Input
@@ -1004,16 +1273,18 @@ export function MembersPage({ role }) {
                             </TextField>
                           </div>
                           <div className="flow-actions">
+                            {isDesktopViewport ? (
+                              <Button
+                                onClick={() => setAddStep(3)}
+                                variant="outline"
+                                fullWidth
+                              >
+                                Back
+                              </Button>
+                            ) : null}
                             <Button
-                              onClick={() => setAddStep(2)}
-                              variant="outline"
-                              fullWidth
-                            >
-                              Back
-                            </Button>
-                            <Button
-                              onClick={() => setAddStep(4)}
-                              disabled={!canProceedStep(3)}
+                              onClick={() => setAddStep(5)}
+                              disabled={!canProceedStep(4)}
                               fullWidth
                             >
                               Next
@@ -1022,9 +1293,9 @@ export function MembersPage({ role }) {
                         </div>
                       )}
 
-                      {/* Screen 4: Birth Details */}
-                      {addStep === 4 && (
-                        <div className="flow-screen flow-screen-4">
+                      {/* Screen 5: Birth Details */}
+                      {addStep === 5 && (
+                        <div className="flow-screen flow-screen-5">
                           <h2>Date of birth</h2>
                           <div className="flow-inputs">
                             <Input
@@ -1033,7 +1304,6 @@ export function MembersPage({ role }) {
                               type="date"
                               value={form.birth_date}
                               onChange={(event) => updateForm('birth_date', event.target.value)}
-                              required
                               fullWidth
                             />
                             <Input
@@ -1046,71 +1316,15 @@ export function MembersPage({ role }) {
                             />
                           </div>
                           <div className="flow-actions">
-                            <Button
-                              onClick={() => setAddStep(3)}
-                              variant="outline"
-                              fullWidth
-                            >
-                              Back
-                            </Button>
-                            <Button
-                              onClick={() => setAddStep(5)}
-                              disabled={!canProceedStep(4)}
-                              fullWidth
-                            >
-                              Next
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Screen 5: Contact Details */}
-                      {addStep === 5 && (
-                        <div className="flow-screen flow-screen-5">
-                          <h2>Contact information</h2>
-                          <div className="flow-inputs">
-                            <Input
-                              label="Email"
-                              leftIcon={<Mail aria-hidden="true" size={20} />}
-                              type="email"
-                              value={form.email}
-                              onChange={(event) => updateForm('email', event.target.value)}
-                              required
-                              fullWidth
-                            />
-                            <Input
-                              label="Phone"
-                              leftIcon={<Phone aria-hidden="true" size={20} />}
-                              value={form.phone}
-                              onChange={(event) => updateForm('phone', event.target.value)}
-                              required
-                              fullWidth
-                            />
-                            <Input
-                              label="City"
-                              leftIcon={<MapPin aria-hidden="true" size={20} />}
-                              value={form.current_city}
-                              onChange={(event) => updateForm('current_city', event.target.value)}
-                              required
-                              fullWidth
-                            />
-                            <Input
-                              label="Country"
-                              leftIcon={<Globe2 aria-hidden="true" size={20} />}
-                              value={form.current_country}
-                              onChange={(event) => updateForm('current_country', event.target.value)}
-                              required
-                              fullWidth
-                            />
-                          </div>
-                          <div className="flow-actions">
-                            <Button
-                              onClick={() => setAddStep(4)}
-                              variant="outline"
-                              fullWidth
-                            >
-                              Back
-                            </Button>
+                            {isDesktopViewport ? (
+                              <Button
+                                onClick={() => setAddStep(4)}
+                                variant="outline"
+                                fullWidth
+                              >
+                                Back
+                              </Button>
+                            ) : null}
                             <Button
                               onClick={() => setAddStep(6)}
                               disabled={!canProceedStep(5)}
@@ -1122,9 +1336,65 @@ export function MembersPage({ role }) {
                         </div>
                       )}
 
-                      {/* Screen 6: Photo Upload */}
+                      {/* Screen 6: Contact Details */}
                       {addStep === 6 && (
                         <div className="flow-screen flow-screen-6">
+                          <h2>Contact information</h2>
+                          <div className="flow-inputs">
+                            <Input
+                              label="Email"
+                              leftIcon={<Mail aria-hidden="true" size={20} />}
+                              type="email"
+                              value={form.email}
+                              onChange={(event) => updateForm('email', event.target.value)}
+                              fullWidth
+                            />
+                            <Input
+                              label="Phone"
+                              leftIcon={<Phone aria-hidden="true" size={20} />}
+                              value={form.phone}
+                              onChange={(event) => updateForm('phone', event.target.value)}
+                              fullWidth
+                            />
+                            <Input
+                              label="City"
+                              leftIcon={<MapPin aria-hidden="true" size={20} />}
+                              value={form.current_city}
+                              onChange={(event) => updateForm('current_city', event.target.value)}
+                              fullWidth
+                            />
+                            <Input
+                              label="Country"
+                              leftIcon={<Globe2 aria-hidden="true" size={20} />}
+                              value={form.current_country}
+                              onChange={(event) => updateForm('current_country', event.target.value)}
+                              fullWidth
+                            />
+                          </div>
+                          <div className="flow-actions">
+                            {isDesktopViewport ? (
+                              <Button
+                                onClick={() => setAddStep(5)}
+                                variant="outline"
+                                fullWidth
+                              >
+                                Back
+                              </Button>
+                            ) : null}
+                            <Button
+                              onClick={() => setAddStep(7)}
+                              disabled={!canProceedStep(6)}
+                              fullWidth
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Screen 7: Photo Upload */}
+                      {addStep === 7 && (
+                        <div className="flow-screen flow-screen-7">
                           <h2>Add a photo</h2>
                           <div className="flow-photo-section">
                             <div className="flow-photo-preview">
@@ -1142,14 +1412,7 @@ export function MembersPage({ role }) {
                                   accept="image/*"
                                   onChange={(event) => {
                                     const file = event.target.files?.[0] ?? null;
-                                    clearPhotoState(editingMember?.photo_url ?? '');
-                                    if (!file) {
-                                      return;
-                                    }
-                                    const nextObjectUrl = URL.createObjectURL(file);
-                                    setPhotoObjectUrl(nextObjectUrl);
-                                    setPhotoFile(file);
-                                    setPhotoPreviewUrl(nextObjectUrl);
+                                    startPhotoCrop(file);
                                   }}
                                   type="file"
                                   style={{ display: 'none' }}
@@ -1180,15 +1443,17 @@ export function MembersPage({ role }) {
                             <canvas ref={canvasRef} style={{ display: 'none' }} />
                           </div>
                           <div className="flow-actions">
+                            {isDesktopViewport ? (
+                              <Button
+                                onClick={() => setAddStep(6)}
+                                variant="outline"
+                                fullWidth
+                              >
+                                Back
+                              </Button>
+                            ) : null}
                             <Button
-                              onClick={() => setAddStep(5)}
-                              variant="outline"
-                              fullWidth
-                            >
-                              Back
-                            </Button>
-                            <Button
-                              onClick={() => setAddStep(7)}
+                              onClick={() => setAddStep(8)}
                               fullWidth
                             >
                               Next
@@ -1197,9 +1462,9 @@ export function MembersPage({ role }) {
                         </div>
                       )}
 
-                      {/* Screen 7: Status Details */}
-                      {addStep === 7 && (
-                        <div className="flow-screen flow-screen-7">
+                      {/* Screen 8: Status Details */}
+                      {addStep === 8 && (
+                        <div className="flow-screen flow-screen-8">
                           <h2>Current status</h2>
                           <div className="flow-inputs">
                             <TextField
@@ -1254,16 +1519,18 @@ export function MembersPage({ role }) {
                             )}
                           </div>
                           <div className="flow-actions">
+                            {isDesktopViewport ? (
+                              <Button
+                                onClick={() => setAddStep(7)}
+                                variant="outline"
+                                fullWidth
+                              >
+                                Back
+                              </Button>
+                            ) : null}
                             <Button
-                              onClick={() => setAddStep(6)}
-                              variant="outline"
-                              fullWidth
-                            >
-                              Back
-                            </Button>
-                            <Button
-                              onClick={() => setAddStep(8)}
-                              disabled={!canProceedStep(7)}
+                              onClick={() => setAddStep(9)}
+                              disabled={!canProceedStep(8)}
                               fullWidth
                             >
                               Review
@@ -1272,11 +1539,20 @@ export function MembersPage({ role }) {
                         </div>
                       )}
 
-                      {/* Screen 8: Review */}
-                      {addStep === 8 && (
-                        <div className="flow-screen flow-screen-8">
+                      {/* Screen 9: Review */}
+                      {addStep === 9 && (
+                        <div className="flow-screen flow-screen-9">
                           <h2>Review your information</h2>
-                          <div className="flow-review">
+                          <div className="flow-review" style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+                            <div className="review-photo-panel">
+                              <div className="flow-photo-preview">
+                                {photoPreviewUrl || croppedImageDataUrl ? (
+                                  <img alt="Member photo preview" src={photoPreviewUrl || croppedImageDataUrl} />
+                                ) : (
+                                  <Network aria-hidden="true" size={48} />
+                                )}
+                              </div>
+                            </div>
                             <div className="review-section">
                               <div className="review-item">
                                 <span className="label">Relationship:</span>
@@ -1293,6 +1569,10 @@ export function MembersPage({ role }) {
                               <div className="review-item">
                                 <span className="label">Birth Date:</span>
                                 <span className="value">{form.birth_date || 'Not set'}</span>
+                              </div>
+                              <div className="review-item">
+                                <span className="label">Birth Time:</span>
+                                <span className="value">{form.birth_time || 'Not set'}</span>
                               </div>
                               <div className="review-item">
                                 <span className="label">Email:</span>
@@ -1325,59 +1605,65 @@ export function MembersPage({ role }) {
                             </div>
                           </div>
                           <div className="flow-actions">
-                            <Button
-                              onClick={() => setAddStep(7)}
-                              variant="outline"
-                              fullWidth
-                            >
-                              Back
-                            </Button>
+                            {isDesktopViewport ? (
+                              <Button
+                                onClick={() => setAddStep(8)}
+                                variant="outline"
+                                fullWidth
+                              >
+                                Back
+                              </Button>
+                            ) : null}
                             <Button
                               onClick={handleSubmit}
                               disabled={!canSubmitMemberForm || isSubmitting}
                               isLoading={isSubmitting}
                               fullWidth
                             >
-                              Add Member
+                              {duplicateDecision === 'use_existing' ? 'Creation Skipped' : 'Add Member'}
                             </Button>
                           </div>
                         </div>
                       )}
 
-                      {/* Screen 9: Success */}
-                      {addStep === 9 && createdMember && (
-                        <div className="flow-screen flow-screen-9">
-                          <div className="flow-success">
-                            <div className="success-avatar">
-                              {createdMember.photo_url || photoPreviewUrl ? (
-                                <img
-                                  alt={createdMember.display_name}
-                                  src={createdMember.photo_url || photoPreviewUrl}
-                                />
-                              ) : (
-                                <Network aria-hidden="true" size={80} />
-                              )}
+                      {/* Screen 10: Success */}
+                      {addStep === 10 && createdMember && (
+                        <div className="flow-screen flow-screen-10">
+                          <div className="flow-success" style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+                            <div className="success-photo-column">
+                              <div className="success-avatar">
+                                {createdMember.photo_url || photoPreviewUrl || croppedImageDataUrl ? (
+                                  <img
+                                    alt={createdMember.display_name}
+                                    src={createdMember.photo_url || photoPreviewUrl || croppedImageDataUrl}
+                                  />
+                                ) : (
+                                  <Network aria-hidden="true" size={80} />
+                                )}
+                              </div>
                             </div>
-                            <h2>{createdMember.display_name}</h2>
-                            <p className="success-subtitle">
-                              {addMemberTypeOptionsForRole.find(([value]) => value === form.add_member_type)?.[1].replace('Add ', '')} added successfully!
-                            </p>
-                            <div className="flow-confirmation">
-                              <div className="confirmation-item">
-                                <span className="label">Child Name:</span>
-                                <span className="value">{createdMember.display_name || form.first_name || 'Not set'}</span>
-                              </div>
-                              <div className="confirmation-item">
-                                <span className="label">Gender:</span>
-                                <span className="value">{createdMember.gender || form.gender || 'Not set'}</span>
-                              </div>
-                              <div className="confirmation-item">
-                                <span className="label">Date of Birth:</span>
-                                <span className="value">{createdMember.birth_date || form.birth_date || 'Not set'}</span>
-                              </div>
-                              <div className="confirmation-item">
-                                <span className="label">Age:</span>
-                                <span className="value">{memberAge(createdMember.birth_date || form.birth_date)}</span>
+                            <div className="success-details-column">
+                              <h2>{createdMember.display_name}</h2>
+                              <p className="success-subtitle">
+                                {addMemberTypeOptionsForRole.find(([value]) => value === form.add_member_type)?.[1].replace('Add ', '')} added successfully!
+                              </p>
+                              <div className="flow-confirmation">
+                                <div className="confirmation-item">
+                                  <span className="label">Name:</span>
+                                  <span className="value">{createdMember.display_name || form.first_name || 'Not set'}</span>
+                                </div>
+                                <div className="confirmation-item">
+                                  <span className="label">Gender:</span>
+                                  <span className="value">{createdMember.gender || form.gender || 'Not set'}</span>
+                                </div>
+                                <div className="confirmation-item">
+                                  <span className="label">Date of Birth:</span>
+                                  <span className="value">{createdMember.birth_date || form.birth_date || 'Not set'}</span>
+                                </div>
+                                <div className="confirmation-item">
+                                  <span className="label">Age:</span>
+                                  <span className="value">{memberAge(createdMember.birth_date || form.birth_date)}</span>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1582,14 +1868,7 @@ export function MembersPage({ role }) {
                         accept="image/*"
                         onChange={(event) => {
                           const file = event.target.files?.[0] ?? null;
-                          clearPhotoState(editingMember?.photo_url ?? '');
-                          if (!file) {
-                            return;
-                          }
-                          const nextObjectUrl = URL.createObjectURL(file);
-                          setPhotoObjectUrl(nextObjectUrl);
-                          setPhotoFile(file);
-                          setPhotoPreviewUrl(nextObjectUrl);
+                          startPhotoCrop(file);
                         }}
                         type="file"
                       />
@@ -1601,14 +1880,7 @@ export function MembersPage({ role }) {
                         capture="environment"
                         onChange={(event) => {
                           const file = event.target.files?.[0] ?? null;
-                          clearPhotoState(editingMember?.photo_url ?? '');
-                          if (!file) {
-                            return;
-                          }
-                          const nextObjectUrl = URL.createObjectURL(file);
-                          setPhotoObjectUrl(nextObjectUrl);
-                          setPhotoFile(file);
-                          setPhotoPreviewUrl(nextObjectUrl);
+                          startPhotoCrop(file);
                         }}
                         type="file"
                       />
@@ -1757,6 +2029,95 @@ export function MembersPage({ role }) {
                   <Pencil aria-hidden="true" />
                   Update member
                 </Button>
+              ) : null}
+
+              {isCropModalOpen && cropSourceUrl ? (
+                <div
+                  aria-label="Crop photo dialog"
+                  role="dialog"
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'rgba(15, 23, 42, 0.72)',
+                    zIndex: 1200,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem',
+                  }}
+                >
+                  <Card
+                    padding="lg"
+                    variant="elevated"
+                    style={{
+                      width: 'min(920px, 100%)',
+                      maxHeight: '90vh',
+                      overflowY: 'auto',
+                    }}
+                  >
+                    <div className="section-heading">
+                      <div>
+                        <h3>Crop member photo</h3>
+                        <small>Square crop is recommended for profile/avatar consistency.</small>
+                      </div>
+                      <Button onClick={closeCropModal} type="button" variant="outline">
+                        Cancel
+                      </Button>
+                    </div>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gap: '1rem',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                      }}
+                    >
+                      <div style={{ minHeight: '260px' }}>
+                        <Cropper
+                          src={cropSourceUrl}
+                          style={{ height: 360, width: '100%' }}
+                          aspectRatio={1}
+                          viewMode={1}
+                          guides={false}
+                          responsive
+                          autoCropArea={1}
+                          checkOrientation={false}
+                          dragMode="move"
+                          zoomable
+                          background={false}
+                          preview=".member-crop-live-preview"
+                          ref={cropperRef}
+                          crop={updateLiveCropPreview}
+                          ready={updateLiveCropPreview}
+                        />
+                      </div>
+                      {isDesktopViewport ? (
+                        <div>
+                          <h4 style={{ marginBottom: '0.5rem' }}>Live preview</h4>
+                          <div
+                            className="member-crop-live-preview"
+                          style={{
+                            width: '100%',
+                            aspectRatio: '1 / 1',
+                            overflow: 'hidden',
+                            borderRadius: '12px',
+                            border: '1px solid var(--color-border, #dbe3ef)',
+                            background: 'var(--color-surface, #f8fbff)',
+                          }}
+                          />
+                          {cropError ? <p className="flow-error">{cropError}</p> : null}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="flow-actions" style={{ marginTop: '1rem' }}>
+                      <Button onClick={closeCropModal} type="button" variant="outline" fullWidth>
+                        Cancel
+                      </Button>
+                      <Button onClick={() => { void applyPhotoCrop(); }} type="button" fullWidth>
+                        Apply Crop
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
               ) : null}
             </form>
           </Card>
@@ -1970,7 +2331,7 @@ function canSubmitAddMemberForm(
     return false;
   }
 
-  return Boolean(form.first_name);
+  return Boolean(form.first_name && form.gender);
 }
 
 function canSubmitAddMemberType(addMemberType) {
