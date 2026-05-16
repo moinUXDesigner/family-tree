@@ -112,8 +112,16 @@ class FamilyMemberController extends Controller
                     && Str::lower((string) $familyMember->email) === Str::lower((string) $user->email)
                 )
             );
+        $isImmediateRelativeEditableMember = false;
 
-        if (! $isSelfEditableMember) {
+        if ($user->hasRole(User::ROLE_USER) && ! $isSelfEditableMember) {
+            $selfMember = $this->selfMember($user, $familyMember->family_id);
+            $isImmediateRelativeEditableMember = $selfMember
+                ? $this->immediateRelativeIds($selfMember, $familyMember->family_id)->contains((int) $familyMember->id)
+                : false;
+        }
+
+        if (! $isSelfEditableMember && ! $isImmediateRelativeEditableMember) {
             $this->ensureMemberAccess($request, $familyMember, true);
         } else {
             $this->ensureMemberAccess($request, $familyMember, false);
@@ -127,6 +135,11 @@ class FamilyMemberController extends Controller
 
         if ($isSelfEditableMember) {
             $familyMember->update($this->selfEditableMemberFields($data));
+        } elseif ($isImmediateRelativeEditableMember) {
+            $familyMember->update([
+                ...$this->memberFields($data),
+                'family_id' => $familyMember->family_id,
+            ]);
         } else {
             $family = $this->accessibleFamily($request, (int) $data['family_id'], true);
             $familyMember->update([
@@ -196,6 +209,40 @@ class FamilyMemberController extends Controller
         ]);
     }
 
+    public function softDelete(Request $request, FamilyMember $familyMember): JsonResponse
+    {
+        $user = $request->user();
+        $this->ensureMemberAccess($request, $familyMember, false);
+
+        if ($user->hasRole(User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN)) {
+            $familyMember->update(['is_private' => true]);
+        } else {
+            $selfMember = $this->selfMember($user, $familyMember->family_id);
+
+            abort_if(! $selfMember, Response::HTTP_FORBIDDEN);
+
+            $allowedIds = $this->immediateRelativeIds($selfMember, $familyMember->family_id);
+            $canSoftDelete = (int) $familyMember->id === (int) $selfMember->id || $allowedIds->contains((int) $familyMember->id);
+
+            abort_if(! $canSoftDelete, Response::HTTP_FORBIDDEN);
+
+            $familyMember->update(['is_private' => true]);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Family member soft-deleted.',
+            'data' => [
+                'member' => $this->memberPayload($familyMember->refresh()->load([
+                    'creator:id,name,email',
+                    'family:id,name',
+                    'familyHead:id,first_name,last_name,marital_status',
+                    'user:id,name,email',
+                ])),
+            ],
+        ]);
+    }
+
     private function requestedFamilyId(Request $request, User $user): ?int
     {
         $familyId = $request->integer('family_id') ?: null;
@@ -230,6 +277,51 @@ class FamilyMemberController extends Controller
     private function ensureMemberAccess(Request $request, FamilyMember $member, bool $write): void
     {
         $this->accessibleFamily($request, $member->family_id, $write);
+    }
+
+    private function selfMember(User $user, int $familyId): ?FamilyMember
+    {
+        return FamilyMember::query()
+            ->where('family_id', $familyId)
+            ->where(function (Builder $query) use ($user): void {
+                $query
+                    ->where('user_id', $user->id)
+                    ->orWhere(function (Builder $query) use ($user): void {
+                        if (! $user->email) {
+                            $query->whereRaw('1 = 0');
+                            return;
+                        }
+
+                        $query->whereRaw('LOWER(email) = ?', [Str::lower($user->email)]);
+                    });
+            })
+            ->first();
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    private function immediateRelativeIds(FamilyMember $selfMember, int $familyId): Collection
+    {
+        return FamilyRelationship::query()
+            ->where('family_id', $familyId)
+            ->whereIn('relationship_type', [
+                FamilyRelationship::TYPE_PARENT,
+                FamilyRelationship::TYPE_SPOUSE,
+                FamilyRelationship::TYPE_SIBLING,
+            ])
+            ->where(function (Builder $query) use ($selfMember): void {
+                $query
+                    ->where('from_member_id', $selfMember->id)
+                    ->orWhere('to_member_id', $selfMember->id);
+            })
+            ->get(['from_member_id', 'to_member_id'])
+            ->flatMap(function (FamilyRelationship $relationship): array {
+                return [(int) $relationship->from_member_id, (int) $relationship->to_member_id];
+            })
+            ->filter(fn (int $id): bool => $id !== (int) $selfMember->id)
+            ->unique()
+            ->values();
     }
 
     /**

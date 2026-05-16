@@ -121,6 +121,7 @@ export function MembersPage({ role }) {
   const [photoObjectUrl, setPhotoObjectUrl] = useState('');
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState('');
+  const [createdMember, setCreatedMember] = useState(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const cameraStreamRef = useRef(null);
@@ -132,6 +133,7 @@ export function MembersPage({ role }) {
   const isEditingMember = Boolean(editingMember);
   const isViewingMember = Boolean(viewingMember);
   const isEndUserAddFlow = role === ROLES.USER && !isEditingMember;
+  const isEndUserRole = role === ROLES.USER;
   const allowedAddMemberTypes = useMemo(
     () => (role === ROLES.USER ? endUserAddMemberTypes : addMemberTypeOptions.map(([value]) => value)),
     [role],
@@ -142,9 +144,55 @@ export function MembersPage({ role }) {
     [role],
   );
   const selectedFamilyId = form.family_id || directoryFamilyId || families[0]?.id || user.family_id || '';
+  const linkedMemberId = useMemo(
+    () => (
+      members.find((item) => item.user_id === user.id)?.id
+      ?? members.find((item) => item.email && user.email && item.email.toLowerCase() === user.email.toLowerCase())?.id
+      ?? ''
+    ),
+    [members, user.email, user.id],
+  );
+  const linkedHouseholds = useMemo(
+    () => households.filter((household) => (
+      Number(household.primary_person_id) === Number(linkedMemberId)
+      || Number(household.spouse_person_id) === Number(linkedMemberId)
+    )),
+    [households, linkedMemberId],
+  );
+  const requiresHouseholdSelection = isEndUserAddFlow && form.add_member_type === 'child' && linkedHouseholds.length > 1;
+  const resolvedHouseholdId = useMemo(() => {
+    if (form.add_member_type !== 'child') {
+      return form.household_id;
+    }
+
+    if (form.household_id) {
+      return form.household_id;
+    }
+
+    if (linkedHouseholds.length === 1) {
+      return String(linkedHouseholds[0].id);
+    }
+
+    return '';
+  }, [form.add_member_type, form.household_id, linkedHouseholds]);
+  const effectiveForm = useMemo(
+    () => ({
+      ...form,
+      existing_person_id: isEndUserAddFlow && needsExistingPerson(form.add_member_type)
+        ? (form.existing_person_id || String(linkedMemberId || ''))
+        : form.existing_person_id,
+      household_id: isEndUserAddFlow && form.add_member_type === 'child'
+        ? resolvedHouseholdId
+        : form.household_id,
+    }),
+    [form, isEndUserAddFlow, linkedMemberId, resolvedHouseholdId],
+  );
+  const requiresStepConfirmation = !isEditingMember && !isEndUserAddFlow && form.add_member_type !== 'existing_to_household';
   const canSubmitMemberForm = isEditingMember
     ? Boolean(selectedFamilyId && form.first_name)
-    : canSubmitAddMemberForm(selectedFamilyId, form, isEndUserAddFlow) && (isEndUserAddFlow ? true : isStep3Confirmed);
+    : canSubmitAddMemberForm(selectedFamilyId, effectiveForm, {
+      ignoreHouseholdRequirement: isEndUserAddFlow && form.add_member_type !== 'child',
+    }) && (!requiresStepConfirmation || isStep3Confirmed);
 
   const stats = useMemo(() => {
     const livingCount = members.filter((member) => member.is_living).length;
@@ -280,14 +328,30 @@ export function MembersPage({ role }) {
 
     try {
       const addMemberType = isEditingMember ? null : form.add_member_type;
+      const resolvedExistingPersonId = needsExistingPerson(addMemberType)
+        ? (form.existing_person_id || (isEndUserAddFlow ? String(linkedMemberId || '') : ''))
+        : '';
+      const resolvedSubmitHouseholdId = needsHousehold(addMemberType)
+        ? (form.household_id || (isEndUserAddFlow && addMemberType === 'child' ? resolvedHouseholdId : ''))
+        : '';
+      if (!isEditingMember && needsExistingPerson(addMemberType) && !resolvedExistingPersonId) {
+        setError('Could not find your linked member profile. Open Tree and use quick add from your card, or ask admin to link your account.');
+        setIsSubmitting(false);
+        return;
+      }
+      if (!isEditingMember && needsHousehold(addMemberType) && !resolvedSubmitHouseholdId) {
+        setError('Please select a household before adding a child.');
+        setIsSubmitting(false);
+        return;
+      }
       const payload = {
         ...form,
         family_id: Number(isEditingMember ? form.tree_family_id || editingMember.family_id : selectedFamilyId),
         add_member_type: addMemberType,
-        existing_person_id: needsExistingPerson(addMemberType) && form.existing_person_id
-          ? Number(form.existing_person_id)
+        existing_person_id: needsExistingPerson(addMemberType) && resolvedExistingPersonId
+          ? Number(resolvedExistingPersonId)
           : null,
-        household_id: needsHousehold(addMemberType) && form.household_id ? Number(form.household_id) : null,
+        household_id: needsHousehold(addMemberType) && resolvedSubmitHouseholdId ? Number(resolvedSubmitHouseholdId) : null,
         family_head_id: isEditingMember && form.family_head_id ? Number(form.family_head_id) : null,
         relationship_to_family_head: isEditingMember ? form.relationship_to_family_head : null,
         is_living: form.living_status === 'living',
@@ -312,10 +376,17 @@ export function MembersPage({ role }) {
       const result = await familyApi.createMember(token, requestPayload);
       await loadFamilyContext(selectedFamilyId);
       setDirectoryFamilyId(selectedFamilyId);
-      setForm({ ...emptyForm, family_id: selectedFamilyId });
-      clearPhotoState('');
-      setSuccess(createMemberSuccessMessage(result));
-      setIsAddingMember(false);
+      
+      // For end user flow, show success screen
+      if (isEndUserAddFlow) {
+        setCreatedMember(result);
+        setAddStep(9); // Success screen
+      } else {
+        setForm({ ...emptyForm, family_id: selectedFamilyId });
+        clearPhotoState('');
+        setSuccess(createMemberSuccessMessage(result));
+        setIsAddingMember(false);
+      }
     } catch (submitError) {
       setError(submitError.message);
     } finally {
@@ -483,7 +554,7 @@ export function MembersPage({ role }) {
       last_name: value === 'existing_to_household' ? '' : current.last_name,
       marital_status: ['child', 'sibling'].includes(value) ? 'unmarried' : 'married',
     }));
-    setAddStep(1);
+    setAddStep(isEndUserAddFlow ? 2 : 1); // Skip to confirm for end users
     setIsStep3Confirmed(false);
   }
 
@@ -499,8 +570,9 @@ export function MembersPage({ role }) {
         : allowedAddMemberTypes[0],
       marital_status: ['child', 'sibling'].includes(form.add_member_type) ? 'unmarried' : 'married',
     });
-    setAddStep(1);
+    setAddStep(isEndUserAddFlow ? 1 : 1); // End users start at relationship selection
     setIsStep3Confirmed(false);
+    setCreatedMember(null);
     clearPhotoState('');
     setIsAddingMember(true);
   }
@@ -563,6 +635,7 @@ export function MembersPage({ role }) {
     stopCamera();
     setEditingMember(null);
     setIsAddingMember(false);
+    setCreatedMember(null);
   }
 
   function showEditMemberForm(member) {
@@ -598,30 +671,46 @@ export function MembersPage({ role }) {
 
   function canProceedStep(step) {
     if (isEndUserAddFlow) {
+      // Screen 1: Relationship Selection
       if (step === 1) {
         return Boolean(form.add_member_type);
       }
-
+      // Screen 2: Confirm Relationship
       if (step === 2) {
+        if (form.add_member_type === 'child' && requiresHouseholdSelection) {
+          return Boolean(form.household_id);
+        }
+
+        return true; // Can always proceed
+      }
+      // Screen 3: Basic Details (Name, Gender)
+      if (step === 3) {
         return Boolean(form.first_name && form.gender);
       }
-
-      if (step === 3) {
+      // Screen 4: Birth Details (DOB, Birth Time)
+      if (step === 4) {
         return Boolean(form.birth_date);
       }
-
-      if (step === 4) {
+      // Screen 5: Contact Details (Email, Phone, Location)
+      if (step === 5) {
         return Boolean(form.email && form.phone && form.current_city && form.current_country);
       }
-
-      if (step === 5) {
-        return true;
-      }
-
+      // Screen 6: Photo Upload
       if (step === 6) {
+        return true; // Photo is optional
+      }
+      // Screen 7: Status Details (Living, Married)
+      if (step === 7) {
         return Boolean(form.living_status && form.marital_status);
       }
-
+      // Screen 8: Review Screen
+      if (step === 8) {
+        return true; // Can always review
+      }
+      // Screen 9: Success Screen
+      if (step === 9) {
+        return Boolean(createdMember);
+      }
       return true;
     }
 
@@ -682,9 +771,9 @@ export function MembersPage({ role }) {
     <main className="dashboard-page">
       <NavigationChrome active="members" role={role} />
 
-      <section className="dashboard-content">
-        <header className="dashboard-header">
-          {!isMemberFormOpen ? (
+      <section className={`dashboard-content ${isMemberFormOpen ? 'members-form-open' : ''}`}>
+        {!isMemberFormOpen ? (
+          <header className="dashboard-header">
             <div>
               <div className="members-header-row">
                 <h1>Family Members</h1>
@@ -698,12 +787,12 @@ export function MembersPage({ role }) {
                 </Button>
               </div>
             </div>
-          ) : <div />}
-          <Button onClick={logout} type="button" variant="outline">
-            <LogOut aria-hidden="true" />
-            Logout
-          </Button>
-        </header>
+            <Button onClick={logout} type="button" variant="outline">
+              <LogOut aria-hidden="true" />
+              Logout
+            </Button>
+          </header>
+        ) : null}
 
         {error ? <Alert variant="error">{error}</Alert> : null}
         <Snackbar
@@ -805,183 +894,327 @@ export function MembersPage({ role }) {
               {!isEditingMember ? (
                 <>
                   {isEndUserAddFlow ? (
-                    <div className="member-conversation">
-                      <div className="conversation-step">
-                        <p className="conversation-question">Select relationship</p>
-                        <div className="conversation-option-grid">
-                          {addMemberTypeOptionsForRole.map(([value, label]) => (
+                    <div className="member-add-flow-fullscreen">
+                      {/* Screen 1: Relationship Selection */}
+                      {addStep === 1 && (
+                        <div className="flow-screen flow-screen-1">
+                          <h2>Who do you want to add?</h2>
+                          <div className="flow-options">
+                            {addMemberTypeOptionsForRole.map(([value, label]) => (
+                              <button
+                                key={value}
+                                className={`flow-option-card ${form.add_member_type === value ? 'active' : ''}`}
+                                onClick={() => updateAddMemberType(value)}
+                                type="button"
+                              >
+                                <span className="option-text">{label.replace('Add ', '')}</span>
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flow-actions">
                             <Button
-                              key={value}
-                              className={form.add_member_type === value ? 'conversation-option active' : 'conversation-option'}
-                              onClick={() => {
-                                updateAddMemberType(value);
-                                setAddStep(1);
-                              }}
-                              type="button"
-                              variant={form.add_member_type === value ? 'solid' : 'outline'}
+                              onClick={() => setAddStep(2)}
+                              disabled={!canProceedStep(1)}
+                              fullWidth
                             >
-                              {label.replace('Add ', '')}
+                              Next
                             </Button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {addStep === 1 ? (
-                        <div className="conversation-step">
-                          <p className="conversation-question">Confirm the relationship</p>
-                          <div className="conversation-summary">
-                            <div>
-                              <strong>Relationship</strong>
-                              <p>{addMemberTypeOptionsForRole.find(([value]) => value === form.add_member_type)?.[1].replace('Add ', '')}</p>
-                            </div>
-                            <div>
-                              <strong>Related person</strong>
-                              <p>You (the logged-in user)</p>
-                            </div>
                           </div>
                         </div>
-                      ) : null}
+                      )}
 
-                      {addStep === 2 ? (
-                        <div className="conversation-step">
-                          <p className="conversation-question">Enter the member's full name and gender</p>
-                          <Input
-                            label="Full name"
-                            leftIcon={<UserRound aria-hidden="true" size={18} />}
-                            value={form.first_name}
-                            onChange={(event) => updateForm('first_name', event.target.value)}
-                            required
-                            fullWidth
-                          />
-                          <TextField
-                            fullWidth
-                            label="Gender"
-                            onChange={(event) => updateForm('gender', event.target.value)}
-                            select
-                            value={form.gender}
-                          >
-                            <MenuItem value="">Select gender</MenuItem>
-                            <MenuItem value="male">Male</MenuItem>
-                            <MenuItem value="female">Female</MenuItem>
-                            <MenuItem value="non_binary">Non-binary</MenuItem>
-                            <MenuItem value="prefer_not_to_say">Prefer not to say</MenuItem>
-                          </TextField>
-                        </div>
-                      ) : null}
-
-                      {addStep === 3 ? (
-                        <div className="conversation-step">
-                          <p className="conversation-question">Date of birth and time</p>
-                          <Input
-                            label="Birth date"
-                            leftIcon={<CalendarDays aria-hidden="true" size={18} />}
-                            type="date"
-                            value={form.birth_date}
-                            onChange={(event) => updateForm('birth_date', event.target.value)}
-                            required
-                            fullWidth
-                          />
-                          <Input
-                            label="Birth time"
-                            leftIcon={<Clock3 aria-hidden="true" size={18} />}
-                            type="time"
-                            value={form.birth_time}
-                            onChange={(event) => updateForm('birth_time', event.target.value)}
-                            fullWidth
-                          />
-                        </div>
-                      ) : null}
-
-                      {addStep === 4 ? (
-                        <div className="conversation-step">
-                          <p className="conversation-question">Contact and location</p>
-                          <Input
-                            label="Email"
-                            leftIcon={<Mail aria-hidden="true" size={18} />}
-                            type="email"
-                            value={form.email}
-                            onChange={(event) => updateForm('email', event.target.value)}
-                            required
-                            fullWidth
-                          />
-                          <Input
-                            label="Phone"
-                            leftIcon={<Phone aria-hidden="true" size={18} />}
-                            value={form.phone}
-                            onChange={(event) => updateForm('phone', event.target.value)}
-                            required
-                            fullWidth
-                          />
-                          <Input
-                            label="City"
-                            leftIcon={<MapPin aria-hidden="true" size={18} />}
-                            value={form.current_city}
-                            onChange={(event) => updateForm('current_city', event.target.value)}
-                            required
-                            fullWidth
-                          />
-                          <Input
-                            label="Country"
-                            leftIcon={<Globe2 aria-hidden="true" size={18} />}
-                            value={form.current_country}
-                            onChange={(event) => updateForm('current_country', event.target.value)}
-                            required
-                            fullWidth
-                          />
-                          <small>Location selection placeholder; integrate Mapbox here if available.</small>
-                        </div>
-                      ) : null}
-
-                      {addStep === 5 ? (
-                        <div className="conversation-step">
-                          <p className="conversation-question">Upload photo and preview</p>
-                          <div className="member-photo-preview">
-                            {photoPreviewUrl ? (
-                              <img alt="Member preview" src={photoPreviewUrl} />
-                            ) : (
-                              <Network aria-hidden="true" size={26} />
-                            )}
+                      {/* Screen 2: Confirm Relationship */}
+                      {addStep === 2 && (
+                        <div className="flow-screen flow-screen-2">
+                          <h2>Confirm the relationship</h2>
+                          <div className="flow-confirmation">
+                            <div className="confirmation-item">
+                              <span className="label">Relationship:</span>
+                              <span className="value">{addMemberTypeOptionsForRole.find(([value]) => value === form.add_member_type)?.[1].replace('Add ', '')}</span>
+                            </div>
+                            <div className="confirmation-item">
+                              <span className="label">Related to:</span>
+                              <span className="value">You (the logged-in user)</span>
+                            </div>
+                            {form.add_member_type === 'child' && requiresHouseholdSelection ? (
+                              <label className="field-group member-form-wide">
+                                Household / Couple Family
+                                <select
+                                  value={form.household_id}
+                                  onChange={(event) => updateForm('household_id', event.target.value)}
+                                  required
+                                >
+                                  <option value="">Select household</option>
+                                  {linkedHouseholds.map((household) => (
+                                    <option key={household.id} value={household.id}>
+                                      {household.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <small>
+                                  You have multiple households. Select where this child should be added.
+                                </small>
+                              </label>
+                            ) : null}
                           </div>
-                          <label className="field-group">
-                            Upload Photo
-                            <input
-                              accept="image/*"
-                              onChange={(event) => {
-                                const file = event.target.files?.[0] ?? null;
-                                clearPhotoState(editingMember?.photo_url ?? '');
-                                if (!file) {
-                                  return;
-                                }
-                                const nextObjectUrl = URL.createObjectURL(file);
-                                setPhotoObjectUrl(nextObjectUrl);
-                                setPhotoFile(file);
-                                setPhotoPreviewUrl(nextObjectUrl);
-                              }}
-                              type="file"
-                            />
-                          </label>
-                          <small>Preview appears above. Crop and adjust using your device before upload.</small>
-                        </div>
-                      ) : null}
-
-                      {addStep === 6 ? (
-                        <div className="conversation-step">
-                          <p className="conversation-question">Living and married status</p>
-                          <label className="field-group">
-                            Married status
-                            <select
-                              value={form.marital_status}
-                              onChange={(event) => updateForm('marital_status', event.target.value)}
-                              required
+                          <div className="flow-actions">
+                            <Button
+                              onClick={() => setAddStep(1)}
+                              variant="outline"
+                              fullWidth
                             >
-                              <option value="unmarried">Unmarried</option>
-                              <option value="married">Married</option>
-                            </select>
-                          </label>
-                          <label className="field-group">
-                            Living status
-                            <select
-                              value={form.living_status}
+                              Back
+                            </Button>
+                            <Button
+                              onClick={() => setAddStep(3)}
+                              fullWidth
+                            >
+                              Confirm
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Screen 3: Basic Details (Name, Gender) */}
+                      {addStep === 3 && (
+                        <div className="flow-screen flow-screen-3">
+                          <h2>Basic information</h2>
+                          <div className="flow-inputs">
+                            <Input
+                              label="Full Name"
+                              leftIcon={<UserRound aria-hidden="true" size={20} />}
+                              value={form.first_name}
+                              onChange={(event) => updateForm('first_name', event.target.value)}
+                              placeholder="Enter full name"
+                              required
+                              fullWidth
+                            />
+                            <TextField
+                              fullWidth
+                              label="Gender"
+                              onChange={(event) => updateForm('gender', event.target.value)}
+                              select
+                              value={form.gender}
+                            >
+                              <MenuItem value="">Select gender</MenuItem>
+                              <MenuItem value="male">Male</MenuItem>
+                              <MenuItem value="female">Female</MenuItem>
+                              <MenuItem value="non_binary">Non-binary</MenuItem>
+                              <MenuItem value="prefer_not_to_say">Prefer not to say</MenuItem>
+                            </TextField>
+                          </div>
+                          <div className="flow-actions">
+                            <Button
+                              onClick={() => setAddStep(2)}
+                              variant="outline"
+                              fullWidth
+                            >
+                              Back
+                            </Button>
+                            <Button
+                              onClick={() => setAddStep(4)}
+                              disabled={!canProceedStep(3)}
+                              fullWidth
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Screen 4: Birth Details */}
+                      {addStep === 4 && (
+                        <div className="flow-screen flow-screen-4">
+                          <h2>Date of birth</h2>
+                          <div className="flow-inputs">
+                            <Input
+                              label="Birth Date"
+                              leftIcon={<CalendarDays aria-hidden="true" size={20} />}
+                              type="date"
+                              value={form.birth_date}
+                              onChange={(event) => updateForm('birth_date', event.target.value)}
+                              required
+                              fullWidth
+                            />
+                            <Input
+                              label="Birth Time (optional)"
+                              leftIcon={<Clock3 aria-hidden="true" size={20} />}
+                              type="time"
+                              value={form.birth_time}
+                              onChange={(event) => updateForm('birth_time', event.target.value)}
+                              fullWidth
+                            />
+                          </div>
+                          <div className="flow-actions">
+                            <Button
+                              onClick={() => setAddStep(3)}
+                              variant="outline"
+                              fullWidth
+                            >
+                              Back
+                            </Button>
+                            <Button
+                              onClick={() => setAddStep(5)}
+                              disabled={!canProceedStep(4)}
+                              fullWidth
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Screen 5: Contact Details */}
+                      {addStep === 5 && (
+                        <div className="flow-screen flow-screen-5">
+                          <h2>Contact information</h2>
+                          <div className="flow-inputs">
+                            <Input
+                              label="Email"
+                              leftIcon={<Mail aria-hidden="true" size={20} />}
+                              type="email"
+                              value={form.email}
+                              onChange={(event) => updateForm('email', event.target.value)}
+                              required
+                              fullWidth
+                            />
+                            <Input
+                              label="Phone"
+                              leftIcon={<Phone aria-hidden="true" size={20} />}
+                              value={form.phone}
+                              onChange={(event) => updateForm('phone', event.target.value)}
+                              required
+                              fullWidth
+                            />
+                            <Input
+                              label="City"
+                              leftIcon={<MapPin aria-hidden="true" size={20} />}
+                              value={form.current_city}
+                              onChange={(event) => updateForm('current_city', event.target.value)}
+                              required
+                              fullWidth
+                            />
+                            <Input
+                              label="Country"
+                              leftIcon={<Globe2 aria-hidden="true" size={20} />}
+                              value={form.current_country}
+                              onChange={(event) => updateForm('current_country', event.target.value)}
+                              required
+                              fullWidth
+                            />
+                          </div>
+                          <div className="flow-actions">
+                            <Button
+                              onClick={() => setAddStep(4)}
+                              variant="outline"
+                              fullWidth
+                            >
+                              Back
+                            </Button>
+                            <Button
+                              onClick={() => setAddStep(6)}
+                              disabled={!canProceedStep(5)}
+                              fullWidth
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Screen 6: Photo Upload */}
+                      {addStep === 6 && (
+                        <div className="flow-screen flow-screen-6">
+                          <h2>Add a photo</h2>
+                          <div className="flow-photo-section">
+                            <div className="flow-photo-preview">
+                              {photoPreviewUrl ? (
+                                <img alt="Member preview" src={photoPreviewUrl} />
+                              ) : (
+                                <Network aria-hidden="true" size={48} />
+                              )}
+                            </div>
+                            <div className="flow-photo-actions">
+                              <label className="flow-photo-upload">
+                                <Upload aria-hidden="true" size={20} />
+                                <span>Choose Photo</span>
+                                <input
+                                  accept="image/*"
+                                  onChange={(event) => {
+                                    const file = event.target.files?.[0] ?? null;
+                                    clearPhotoState(editingMember?.photo_url ?? '');
+                                    if (!file) {
+                                      return;
+                                    }
+                                    const nextObjectUrl = URL.createObjectURL(file);
+                                    setPhotoObjectUrl(nextObjectUrl);
+                                    setPhotoFile(file);
+                                    setPhotoPreviewUrl(nextObjectUrl);
+                                  }}
+                                  type="file"
+                                  style={{ display: 'none' }}
+                                />
+                              </label>
+                              <Button
+                                onClick={openCamera}
+                                variant="outline"
+                                fullWidth
+                              >
+                                <span>Take Photo</span>
+                              </Button>
+                            </div>
+                            {isCameraOpen && (
+                              <div className="flow-camera-panel">
+                                <video autoPlay playsInline ref={videoRef} />
+                                <div className="flow-camera-actions">
+                                  <Button onClick={captureFromCamera} fullWidth>
+                                    Capture
+                                  </Button>
+                                  <Button onClick={stopCamera} variant="outline" fullWidth>
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                            {cameraError && <p className="flow-error">{cameraError}</p>}
+                            <canvas ref={canvasRef} style={{ display: 'none' }} />
+                          </div>
+                          <div className="flow-actions">
+                            <Button
+                              onClick={() => setAddStep(5)}
+                              variant="outline"
+                              fullWidth
+                            >
+                              Back
+                            </Button>
+                            <Button
+                              onClick={() => setAddStep(7)}
+                              fullWidth
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Screen 7: Status Details */}
+                      {addStep === 7 && (
+                        <div className="flow-screen flow-screen-7">
+                          <h2>Current status</h2>
+                          <div className="flow-inputs">
+                            <TextField
+                              fullWidth
+                              label="Marital Status"
+                              onChange={(event) => updateForm('marital_status', event.target.value)}
+                              select
+                              value={form.marital_status}
+                            >
+                              <MenuItem value="unmarried">Unmarried</MenuItem>
+                              <MenuItem value="married">Married</MenuItem>
+                            </TextField>
+                            <TextField
+                              fullWidth
+                              label="Living Status"
                               onChange={(event) => {
                                 if (event.target.value === 'living') {
                                   setForm((current) => ({
@@ -992,116 +1225,172 @@ export function MembersPage({ role }) {
                                   }));
                                   return;
                                 }
-
                                 updateForm('living_status', event.target.value);
                               }}
-                              required
+                              select
+                              value={form.living_status}
                             >
-                              <option value="living">Living</option>
-                              <option value="deceased">Deceased</option>
-                            </select>
-                          </label>
-                          {form.living_status === 'deceased' ? (
-                            <>
-                              <Input
-                                label="Date of expiry"
-                                leftIcon={<CalendarDays aria-hidden="true" size={18} />}
-                                type="date"
-                                value={form.death_date}
-                                onChange={(event) => updateForm('death_date', event.target.value)}
-                                fullWidth
-                              />
-                              <Input
-                                label="Graveyard location"
-                                leftIcon={<MapPin aria-hidden="true" size={18} />}
-                                value={form.graveyard_location}
-                                onChange={(event) => updateForm('graveyard_location', event.target.value)}
-                                fullWidth
-                              />
-                            </>
-                          ) : null}
-                        </div>
-                      ) : null}
-
-                      {addStep === 7 ? (
-                        <div className="conversation-step">
-                          <p className="conversation-question">Review all details</p>
-                          <div className="conversation-summary">
-                            <div>
-                              <strong>Relationship</strong>
-                              <p>{addMemberTypeOptionsForRole.find(([value]) => value === form.add_member_type)?.[1].replace('Add ', '')}</p>
-                            </div>
-                            <div>
-                              <strong>Full name</strong>
-                              <p>{form.first_name}</p>
-                            </div>
-                            <div>
-                              <strong>Gender</strong>
-                              <p>{form.gender || 'Not set'}</p>
-                            </div>
-                            <div>
-                              <strong>Date of birth</strong>
-                              <p>{form.birth_date || 'Not set'}</p>
-                            </div>
-                            <div>
-                              <strong>Birth time</strong>
-                              <p>{form.birth_time || 'Not set'}</p>
-                            </div>
-                            <div>
-                              <strong>Email</strong>
-                              <p>{form.email || 'Not set'}</p>
-                            </div>
-                            <div>
-                              <strong>Phone</strong>
-                              <p>{form.phone || 'Not set'}</p>
-                            </div>
-                            <div>
-                              <strong>Location</strong>
-                              <p>{[form.current_city, form.current_country].filter(Boolean).join(', ') || 'Not set'}</p>
-                            </div>
-                            <div>
-                              <strong>Photo</strong>
-                              <p>{photoPreviewUrl ? 'Uploaded' : 'No photo'}</p>
-                            </div>
-                            <div>
-                              <strong>Marital status</strong>
-                              <p>{form.marital_status}</p>
-                            </div>
-                            <div>
-                              <strong>Living status</strong>
-                              <p>{form.living_status === 'living' ? 'Living' : 'Deceased'}</p>
-                            </div>
+                              <MenuItem value="living">Living</MenuItem>
+                              <MenuItem value="deceased">Deceased</MenuItem>
+                            </TextField>
+                            {form.living_status === 'deceased' && (
+                              <>
+                                <Input
+                                  label="Date of Passing"
+                                  leftIcon={<CalendarDays aria-hidden="true" size={20} />}
+                                  type="date"
+                                  value={form.death_date}
+                                  onChange={(event) => updateForm('death_date', event.target.value)}
+                                  fullWidth
+                                />
+                                <Input
+                                  label="Graveyard Location"
+                                  leftIcon={<MapPin aria-hidden="true" size={20} />}
+                                  value={form.graveyard_location}
+                                  onChange={(event) => updateForm('graveyard_location', event.target.value)}
+                                  fullWidth
+                                />
+                              </>
+                            )}
+                          </div>
+                          <div className="flow-actions">
+                            <Button
+                              onClick={() => setAddStep(6)}
+                              variant="outline"
+                              fullWidth
+                            >
+                              Back
+                            </Button>
+                            <Button
+                              onClick={() => setAddStep(8)}
+                              disabled={!canProceedStep(7)}
+                              fullWidth
+                            >
+                              Review
+                            </Button>
                           </div>
                         </div>
-                      ) : null}
+                      )}
 
-                      <div className="conversation-actions">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={addStep === 1}
-                          onClick={() => setAddStep((current) => Math.max(1, current - 1))}
-                        >
-                          Back
-                        </Button>
-                        {addStep < 7 ? (
-                          <Button
-                            type="button"
-                            disabled={!canProceedStep(addStep)}
-                            onClick={() => setAddStep((current) => Math.min(7, current + 1))}
-                          >
-                            Next
-                          </Button>
-                        ) : (
-                          <Button
-                            type="submit"
-                            disabled={!canSubmitMemberForm || isSubmitting}
-                            isLoading={isSubmitting}
-                          >
-                            Add member
-                          </Button>
-                        )}
-                      </div>
+                      {/* Screen 8: Review */}
+                      {addStep === 8 && (
+                        <div className="flow-screen flow-screen-8">
+                          <h2>Review your information</h2>
+                          <div className="flow-review">
+                            <div className="review-section">
+                              <div className="review-item">
+                                <span className="label">Relationship:</span>
+                                <span className="value">{addMemberTypeOptionsForRole.find(([value]) => value === form.add_member_type)?.[1].replace('Add ', '')}</span>
+                              </div>
+                              <div className="review-item">
+                                <span className="label">Full Name:</span>
+                                <span className="value">{form.first_name || 'Not set'}</span>
+                              </div>
+                              <div className="review-item">
+                                <span className="label">Gender:</span>
+                                <span className="value">{form.gender || 'Not set'}</span>
+                              </div>
+                              <div className="review-item">
+                                <span className="label">Birth Date:</span>
+                                <span className="value">{form.birth_date || 'Not set'}</span>
+                              </div>
+                              <div className="review-item">
+                                <span className="label">Email:</span>
+                                <span className="value">{form.email || 'Not set'}</span>
+                              </div>
+                              <div className="review-item">
+                                <span className="label">Phone:</span>
+                                <span className="value">{form.phone || 'Not set'}</span>
+                              </div>
+                              <div className="review-item">
+                                <span className="label">Location:</span>
+                                <span className="value">{[form.current_city, form.current_country].filter(Boolean).join(', ') || 'Not set'}</span>
+                              </div>
+                              {form.add_member_type === 'child' ? (
+                                <div className="review-item">
+                                  <span className="label">Household:</span>
+                                  <span className="value">
+                                    {linkedHouseholds.find((household) => String(household.id) === String(resolvedHouseholdId))?.name || 'Not selected'}
+                                  </span>
+                                </div>
+                              ) : null}
+                              <div className="review-item">
+                                <span className="label">Marital Status:</span>
+                                <span className="value">{form.marital_status}</span>
+                              </div>
+                              <div className="review-item">
+                                <span className="label">Living Status:</span>
+                                <span className="value">{form.living_status === 'living' ? 'Living' : 'Deceased'}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flow-actions">
+                            <Button
+                              onClick={() => setAddStep(7)}
+                              variant="outline"
+                              fullWidth
+                            >
+                              Back
+                            </Button>
+                            <Button
+                              onClick={handleSubmit}
+                              disabled={!canSubmitMemberForm || isSubmitting}
+                              isLoading={isSubmitting}
+                              fullWidth
+                            >
+                              Add Member
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Screen 9: Success */}
+                      {addStep === 9 && createdMember && (
+                        <div className="flow-screen flow-screen-9">
+                          <div className="flow-success">
+                            <div className="success-avatar">
+                              {createdMember.photo_url || photoPreviewUrl ? (
+                                <img
+                                  alt={createdMember.display_name}
+                                  src={createdMember.photo_url || photoPreviewUrl}
+                                />
+                              ) : (
+                                <Network aria-hidden="true" size={80} />
+                              )}
+                            </div>
+                            <h2>{createdMember.display_name}</h2>
+                            <p className="success-subtitle">
+                              {addMemberTypeOptionsForRole.find(([value]) => value === form.add_member_type)?.[1].replace('Add ', '')} added successfully!
+                            </p>
+                            <div className="flow-confirmation">
+                              <div className="confirmation-item">
+                                <span className="label">Child Name:</span>
+                                <span className="value">{createdMember.display_name || form.first_name || 'Not set'}</span>
+                              </div>
+                              <div className="confirmation-item">
+                                <span className="label">Gender:</span>
+                                <span className="value">{createdMember.gender || form.gender || 'Not set'}</span>
+                              </div>
+                              <div className="confirmation-item">
+                                <span className="label">Date of Birth:</span>
+                                <span className="value">{createdMember.birth_date || form.birth_date || 'Not set'}</span>
+                              </div>
+                              <div className="confirmation-item">
+                                <span className="label">Age:</span>
+                                <span className="value">{memberAge(createdMember.birth_date || form.birth_date)}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flow-actions">
+                            <Button
+                              onClick={hideAddMemberForm}
+                              fullWidth
+                            >
+                              Done
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <>
@@ -1458,7 +1747,7 @@ export function MembersPage({ role }) {
                     </>
                   )}
                 </div>
-              ) : (
+              ) : isEditingMember ? (
                 <Button
                   className="member-form-action"
                   disabled={isSubmitting || !canSubmitMemberForm}
@@ -1468,38 +1757,102 @@ export function MembersPage({ role }) {
                   <Pencil aria-hidden="true" />
                   Update member
                 </Button>
-              )}
+              ) : null}
             </form>
           </Card>
         ) : (
           <div className="member-list">
             {isViewingMember ? (
-              <section className="member-fullscreen-view" aria-label="Member details">
-                <div className="member-fullscreen-header">
-                  <h3>{viewingMember.display_name}</h3>
-                  <button className="text-action" onClick={() => setViewingMember(null)} type="button">
-                    <X aria-hidden="true" size={16} />
-                    Close
-                  </button>
-                </div>
-                <div className="member-fullscreen-grid">
-                  <div><strong>Status</strong><p>{viewingMember.is_living ? 'Living' : 'Deceased'}</p></div>
-                  <div><strong>Family</strong><p>{viewingMember.display_family_name || 'Not added'}</p></div>
-                  <div><strong>Household</strong><p>{viewingMember.household_name || 'Not added'}</p></div>
-                  <div><strong>Birth Date</strong><p>{viewingMember.birth_date || 'Not added'}</p></div>
-                  <div><strong>Death Date</strong><p>{viewingMember.death_date || 'Not added'}</p></div>
-                  <div><strong>Gender</strong><p>{viewingMember.gender || 'Not added'}</p></div>
-                  <div><strong>Email</strong><p>{viewingMember.email || 'Not added'}</p></div>
-                  <div><strong>Phone</strong><p>{viewingMember.phone || 'Not added'}</p></div>
-                  <div><strong>City</strong><p>{viewingMember.current_city || 'Not added'}</p></div>
-                  <div><strong>Country</strong><p>{viewingMember.current_country || 'Not added'}</p></div>
-                  <div><strong>Relationship</strong><p>{viewingMember.family_head_name && viewingMember.relation_to_family_head ? `${relationshipLabel(viewingMember.relation_to_family_head)} of ${viewingMember.family_head_name}` : 'Not added'}</p></div>
-                  <div><strong>Added By</strong><p>{[viewingMember.creator_name, viewingMember.creator_email].filter(Boolean).join(' | ') || 'Not recorded'}</p></div>
-                </div>
+              <section className={`member-fullscreen-view ${isEndUserRole ? 'member-profile-view' : ''}`} aria-label="Member details">
+                {isEndUserRole ? (
+                  <>
+                    <div className="member-profile-topbar">
+                      <button className="text-action" onClick={() => setViewingMember(null)} type="button">
+                        <X aria-hidden="true" size={16} />
+                        Close
+                      </button>
+                      <button className="member-profile-edit-fab" onClick={() => showEditMemberForm(viewingMember)} type="button">
+                        <Pencil aria-hidden="true" size={16} />
+                      </button>
+                    </div>
+                    <div className="member-profile-hero" />
+                    <div className="member-profile-head">
+                      <div className="member-profile-avatar" aria-hidden="true">
+                        {viewingMember.photo_url ? (
+                          <img alt="" src={viewingMember.photo_url} />
+                        ) : (
+                          <Network aria-hidden="true" size={46} />
+                        )}
+                      </div>
+                      <h3>{viewingMember.display_name}</h3>
+                      <p>{viewingMember.household_name || viewingMember.display_family_name || 'Family member'}</p>
+                      <small>{[viewingMember.current_city, viewingMember.current_country].filter(Boolean).join(', ') || 'Location not added'}</small>
+                    </div>
+                    <div className="member-profile-card">
+                      <div className="member-profile-grid">
+                        <div><strong>Date of Birth</strong><p>{viewingMember.birth_date || 'Not added'}</p></div>
+                        <div><strong>Gender</strong><p>{viewingMember.gender || 'Not added'}</p></div>
+                        <div><strong>Age</strong><p>{memberAge(viewingMember.birth_date)}</p></div>
+                        <div><strong>Status</strong><p>{viewingMember.is_living ? 'Living' : 'Deceased'}</p></div>
+                        <div><strong>Mobile Number</strong><p>{viewingMember.phone || 'Not added'}</p></div>
+                        <div><strong>E-Mail ID</strong><p>{viewingMember.email || 'Not added'}</p></div>
+                        <div><strong>Relationship</strong><p>{viewingMember.family_head_name && viewingMember.relation_to_family_head ? `${relationshipLabel(viewingMember.relation_to_family_head)} of ${viewingMember.family_head_name}` : 'Not added'}</p></div>
+                        <div><strong>Family</strong><p>{viewingMember.display_family_name || 'Not added'}</p></div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="member-fullscreen-header">
+                      <h3>{viewingMember.display_name}</h3>
+                      <button className="text-action" onClick={() => setViewingMember(null)} type="button">
+                        <X aria-hidden="true" size={16} />
+                        Close
+                      </button>
+                    </div>
+                    <div className="member-fullscreen-grid">
+                      <div><strong>Status</strong><p>{viewingMember.is_living ? 'Living' : 'Deceased'}</p></div>
+                      <div><strong>Family</strong><p>{viewingMember.display_family_name || 'Not added'}</p></div>
+                      <div><strong>Household</strong><p>{viewingMember.household_name || 'Not added'}</p></div>
+                      <div><strong>Birth Date</strong><p>{viewingMember.birth_date || 'Not added'}</p></div>
+                      <div><strong>Death Date</strong><p>{viewingMember.death_date || 'Not added'}</p></div>
+                      <div><strong>Gender</strong><p>{viewingMember.gender || 'Not added'}</p></div>
+                      <div><strong>Email</strong><p>{viewingMember.email || 'Not added'}</p></div>
+                      <div><strong>Phone</strong><p>{viewingMember.phone || 'Not added'}</p></div>
+                      <div><strong>City</strong><p>{viewingMember.current_city || 'Not added'}</p></div>
+                      <div><strong>Country</strong><p>{viewingMember.current_country || 'Not added'}</p></div>
+                      <div><strong>Relationship</strong><p>{viewingMember.family_head_name && viewingMember.relation_to_family_head ? `${relationshipLabel(viewingMember.relation_to_family_head)} of ${viewingMember.family_head_name}` : 'Not added'}</p></div>
+                      <div><strong>Added By</strong><p>{[viewingMember.creator_name, viewingMember.creator_email].filter(Boolean).join(' | ') || 'Not recorded'}</p></div>
+                    </div>
+                  </>
+                )}
               </section>
             ) : null}
 
-            {!isViewingMember ? filteredMembers.map((member) => (
+            {!isViewingMember && isLoading ? (
+              [...Array(5)].map((_, index) => (
+                <article className="member-row member-row-skeleton" key={`member-skeleton-${index}`}>
+                  <div className="member-leading">
+                    <div className="member-avatar member-skeleton-block" aria-hidden="true" />
+                    <div className="member-leading-meta">
+                      <span className="member-skeleton-pill" />
+                      <span className="member-skeleton-line short" />
+                    </div>
+                  </div>
+                  <div className="member-main">
+                    <div className="member-title-line">
+                      <span className="member-skeleton-line medium" />
+                    </div>
+                    <small className="member-skeleton-line long" />
+                  </div>
+                  <div className="member-meta">
+                    <span className="member-skeleton-line short" />
+                  </div>
+                </article>
+              ))
+            ) : null}
+
+            {!isViewingMember && !isLoading ? filteredMembers.map((member) => (
               <article className="member-row" key={member.id}>
                 <div className="member-leading">
                   <div className="member-avatar" aria-hidden="true">
@@ -1514,7 +1867,7 @@ export function MembersPage({ role }) {
                       {member.is_living ? 'Living' : 'Deceased'}
                     </Badge>
                     <button
-                      className="text-action"
+                      className={isEndUserRole ? 'text-action member-inline-action' : 'text-action'}
                       onClick={() => setViewingMember(member)}
                       type="button"
                     >
@@ -1554,7 +1907,7 @@ export function MembersPage({ role }) {
                   ) : null}
                   {canEditMembers ? (
                     <button
-                      className="text-action"
+                      className={isEndUserRole ? 'text-action member-inline-action' : 'text-action'}
                       onClick={() => showEditMemberForm(member)}
                       type="button"
                     >
@@ -1593,7 +1946,14 @@ function sortMembers(first, second) {
   return first.display_name.localeCompare(second.display_name);
 }
 
-function canSubmitAddMemberForm(selectedFamilyId, form, ignoreHouseholdRequirement = false) {
+function canSubmitAddMemberForm(
+  selectedFamilyId,
+  form,
+  {
+    ignoreHouseholdRequirement = false,
+    ignoreExistingPersonRequirement = false,
+  } = {},
+) {
   if (!selectedFamilyId || !canSubmitAddMemberType(form.add_member_type)) {
     return false;
   }
@@ -1602,7 +1962,7 @@ function canSubmitAddMemberForm(selectedFamilyId, form, ignoreHouseholdRequireme
     return Boolean(form.existing_person_id && form.household_id);
   }
 
-  if (needsExistingPerson(form.add_member_type) && !form.existing_person_id) {
+  if (!ignoreExistingPersonRequirement && needsExistingPerson(form.add_member_type) && !form.existing_person_id) {
     return false;
   }
 
@@ -1644,6 +2004,27 @@ function createMemberSuccessMessage(result) {
 
 function relationshipLabel(value) {
   return relationshipOptions.find(([optionValue]) => optionValue === value)?.[1] ?? value;
+}
+
+function memberAge(birthDate) {
+  if (!birthDate) {
+    return 'Not set';
+  }
+
+  const dob = new Date(birthDate);
+  if (Number.isNaN(dob.getTime())) {
+    return 'Not set';
+  }
+
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDelta = today.getMonth() - dob.getMonth();
+
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < dob.getDate())) {
+    age -= 1;
+  }
+
+  return age >= 0 ? `${age} years` : 'Not set';
 }
 
 function buildMemberRequestPayload(payload, photoFile) {

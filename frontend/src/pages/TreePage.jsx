@@ -197,7 +197,9 @@ export function TreePage({ role }) {
               <Network aria-hidden="true" />
             </div>
 
-            {focusedNode ? (
+            {isLoading ? <TreeLoadingSkeleton /> : null}
+
+            {!isLoading && focusedNode ? (
               <FocusedFamilyGraph
                 family={focusedFamily}
                 familyHeadId={familyHeadId}
@@ -645,5 +647,70 @@ function lifeYears(member) {
   }
 
   return member.is_living ? 'Living' : 'Dead';
+}
+
+function TreeLoadingSkeleton() {
+  return (
+    <div className="tree-loading-shell" aria-hidden="true">
+      <section className="tree-relation-section">
+        <div className="tree-section-title">
+          <span className="tree-skeleton-line short" />
+        </div>
+        <div className="tree-card-grid">
+          {[...Array(2)].map((_, index) => (
+            <div className="tree-person-card tree-skeleton-card" key={`tree-parent-skeleton-${index}`}>
+              <span className="tree-person-avatar tree-skeleton-avatar" />
+              <span className="tree-person-copy">
+                <span className="tree-skeleton-line medium" />
+                <span className="tree-skeleton-line short" />
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="tree-relation-section self-section">
+        <div className="tree-section-title">
+          <span className="tree-skeleton-line short" />
+        </div>
+        <div className="tree-self-row">
+          <div className="tree-person-card tree-skeleton-card">
+            <span className="tree-person-avatar tree-skeleton-avatar" />
+            <span className="tree-person-copy">
+              <span className="tree-skeleton-line medium" />
+              <span className="tree-skeleton-line short" />
+            </span>
+          </div>
+          <div className="tree-spouse-group">
+            <span className="tree-skeleton-line short" />
+            <div className="tree-card-grid compact">
+              <div className="tree-person-card tree-skeleton-card">
+                <span className="tree-person-avatar tree-skeleton-avatar" />
+                <span className="tree-person-copy">
+                  <span className="tree-skeleton-line medium" />
+                  <span className="tree-skeleton-line short" />
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="tree-relation-section">
+        <div className="tree-section-title">
+          <span className="tree-skeleton-line short" />
+        </div>
+        <div className="tree-card-grid">
+          <div className="tree-person-card tree-skeleton-card">
+            <span className="tree-person-avatar tree-skeleton-avatar" />
+            <span className="tree-person-copy">
+              <span className="tree-skeleton-line medium" />
+              <span className="tree-skeleton-line short" />
+            </span>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
 }
 

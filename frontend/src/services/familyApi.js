@@ -48,6 +48,11 @@ export const familyApi = {
     await apiClient.delete(`/family-members/${memberId}`, token);
   },
 
+  async softDeleteMember(token, memberId) {
+    const response = await apiClient.put(`/family-members/${memberId}/soft-delete`, {}, token);
+    return response.data.member;
+  },
+
   async updateMemberPhoto(token, memberId, photoFile) {
     const formData = new FormData();
     formData.append('photo', photoFile);

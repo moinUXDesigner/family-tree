@@ -11,6 +11,7 @@ import { FeedbackInboxPage } from './pages/FeedbackInboxPage.jsx';
 import { FeedbackPage } from './pages/FeedbackPage.jsx';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage.jsx';
 import { MembersPage } from './pages/MembersPage.jsx';
+import { MyFamilyPage } from './pages/MyFamilyPage.jsx';
 import { PasswordChangedPage } from './pages/PasswordChangedPage.jsx';
 import { ProfilePage } from './pages/ProfilePage.jsx';
 import { RootFamilyPage } from './pages/RootFamilyPage.jsx';
@@ -89,6 +90,7 @@ export function App() {
             <Route element={<RequireFamilyConnection />}>
               <Route path="/app/dashboard" element={<DashboardPage role={ROLES.USER} />} />
               <Route path="/app/members" element={<MembersPage role={ROLES.USER} />} />
+              <Route path="/app/my-family" element={<MyFamilyPage />} />
               <Route path="/app/tree" element={<TreePage role={ROLES.USER} />} />
             </Route>
           </Route>

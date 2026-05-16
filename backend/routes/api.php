@@ -40,6 +40,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/family-members', [FamilyMemberController::class, 'store']);
             Route::post('/family-members/{familyMember}/photo', [FamilyMemberController::class, 'updatePhoto']);
             Route::put('/family-members/{familyMember}', [FamilyMemberController::class, 'update']);
+            Route::put('/family-members/{familyMember}/soft-delete', [FamilyMemberController::class, 'softDelete']);
             Route::get('/family-relationships', [FamilyRelationshipController::class, 'index']);
             Route::get('/households', [HouseholdController::class, 'index']);
             Route::get('/family-tree', [FamilyTreeController::class, 'show']);

@@ -53,6 +53,15 @@ const navItems = [
     },
   },
   {
+    key: 'my-family',
+    label: 'My Family',
+    icon: <FamilyRestroom />,
+    roles: [ROLES.USER],
+    route: {
+      [ROLES.USER]: '/app/my-family',
+    },
+  },
+  {
     key: 'families',
     label: 'Families',
     icon: <RecentActors />,
@@ -111,7 +120,7 @@ const feedbackInboxRoutes = {
   [ROLES.ADMIN]: '/admin/feedbacks',
 };
 
-const bottomNavHiddenKeys = new Set(['members', 'families', 'root-family', 'users', 'approvals']);
+const bottomNavHiddenKeys = new Set(['members', 'families', 'root-family', 'users', 'approvals', 'my-family']);
 
 export function NavigationChrome({ active, mobileBackTo = '', role }) {
   const { logout, user } = useAuth();
