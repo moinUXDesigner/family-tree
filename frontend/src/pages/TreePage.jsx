@@ -5,6 +5,7 @@ import { useAuth } from '../auth/useAuth.js';
 import { ROLE_HOME, ROLES } from '../config/roles.js';
 import { NavigationChrome } from '../app/NavigationChrome.jsx';
 import { Alert, Badge, Button, Card } from '../app/components';
+import { LoadingCard } from '../app/components/LoadingCard.jsx';
 import { familyApi } from '../services/familyApi.js';
 import { treeApi } from '../services/treeApi.js';
 
@@ -27,13 +28,14 @@ const treeRoutes = {
 };
 
 export function TreePage({ role }) {
-  const { logout, token, user } = useAuth();
+  const { logout, stopRouteTransition, token, user } = useAuth();
   const [families, setFamilies] = useState([]);
   const [selectedFamilyId, setSelectedFamilyId] = useState(user.family_id ?? '');
   const [tree, setTree] = useState({ family: null, nodes: [], links: [], root_member_ids: [] });
   const [focusMemberId, setFocusMemberId] = useState(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState('Preparing family tree view...');
 
   const nodeMap = useMemo(
     () => new Map(tree.nodes.map((node) => [node.id, node])),
@@ -72,6 +74,7 @@ export function TreePage({ role }) {
     let isMounted = true;
 
     async function loadFamilies() {
+      setLoadingStatus('Loading family profiles...');
       try {
         const nextFamilies = await familyApi.listFamilies(token);
         const nextFamilyId = selectedFamilyId || nextFamilies[0]?.id || user.family_id || '';
@@ -99,6 +102,7 @@ export function TreePage({ role }) {
 
   useEffect(() => {
     if (!selectedFamilyId) {
+      stopRouteTransition();
       return;
     }
 
@@ -107,6 +111,7 @@ export function TreePage({ role }) {
     async function loadTree() {
       setIsLoading(true);
       setError('');
+      setLoadingStatus('Loading family tree relationships...');
 
       try {
         const nextTree = await treeApi.getTree(token, selectedFamilyId);
@@ -121,6 +126,7 @@ export function TreePage({ role }) {
       } finally {
         if (isMounted) {
           setIsLoading(false);
+          stopRouteTransition();
         }
       }
     }
@@ -130,7 +136,7 @@ export function TreePage({ role }) {
     return () => {
       isMounted = false;
     };
-  }, [selectedFamilyId, token]);
+  }, [selectedFamilyId, stopRouteTransition, token]);
 
   const stats = [
     ['Members', tree.nodes.length],
@@ -143,87 +149,92 @@ export function TreePage({ role }) {
       <NavigationChrome active="tree" role={role} />
 
       <section className="dashboard-content tree-dashboard-content">
-        <header className="dashboard-header">
-          <div>
-          </div>
-          <Button onClick={logout} type="button" variant="outline">
-            <LogOut aria-hidden="true" />
-            Logout
-          </Button>
-        </header>
-
-        {error ? <Alert variant="error">{error}</Alert> : null}
-
-        <section className="metric-grid" aria-label="Family tree summary">
-          {stats.map(([label, value]) => (
-            <Card className="metric-card" key={label} padding="md" variant="elevated">
-              <span>{label}</span>
-              <strong>{value}</strong>
-            </Card>
-          ))}
-        </section>
-
-        {families.length > 1 ? (
-          <Card padding="md" variant="bordered">
-            <label className="field-group tree-family-select">
-              Family
-              <select
-                value={selectedFamilyId}
-                onChange={(event) => setSelectedFamilyId(event.target.value)}
-              >
-                {families.map((family) => (
-                  <option key={family.id} value={family.id}>
-                    {family.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </Card>
-        ) : null}
-
-        <section className="tree-layout">
-          <Card className="tree-graph-card" padding="lg" variant="elevated">
-            <div className="section-heading tree-desktop-heading">
+        {isLoading ? (
+          <LoadingCard
+            messages={['Loading family tree relationships...']}
+            variant="relationships"
+          />
+        ) : (
+          <>
+            <header className="dashboard-header">
               <div>
-                <h2>Tree graph</h2>
-                <p>
-                  {isLoading
-                    ? 'Loading tree...'
-                    : focusedNode
-                      ? `${focusedNode.name} is shown as Self.`
-                      : 'Choose a member to view their immediate family.'}
-                </p>
               </div>
-              <Network aria-hidden="true" />
-            </div>
+              <Button onClick={logout} type="button" variant="outline">
+                <LogOut aria-hidden="true" />
+                Logout
+              </Button>
+            </header>
 
-            {isLoading ? <TreeLoadingSkeleton /> : null}
+            {error ? <Alert variant="error">{error}</Alert> : null}
 
-            {!isLoading && focusedNode ? (
-              <FocusedFamilyGraph
-                family={focusedFamily}
-                familyHeadId={familyHeadId}
-                focusMemberId={focusMemberId}
-                onFocus={setFocusMemberId}
-                role={role}
-              />
+            <section className="metric-grid" aria-label="Family tree summary">
+              {stats.map(([label, value]) => (
+                <Card className="metric-card" key={label} padding="md" variant="elevated">
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                </Card>
+              ))}
+            </section>
+
+            {families.length > 1 ? (
+              <Card padding="md" variant="bordered">
+                <label className="field-group tree-family-select">
+                  Family
+                  <select
+                    value={selectedFamilyId}
+                    onChange={(event) => setSelectedFamilyId(event.target.value)}
+                  >
+                    {families.map((family) => (
+                      <option key={family.id} value={family.id}>
+                        {family.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </Card>
             ) : null}
 
-            {!isLoading && tree.nodes.length === 0 ? (
-              <div className="tree-canvas">
-                <div className="empty-state">
-                  <UsersRound aria-hidden="true" />
-                  <strong>No members yet</strong>
-                  <p>Add members and relationships to render a tree.</p>
-                  <Button component={Link} to={memberRoutes[role] ?? '/app/members'} type="button" variant="outline">
-                    <Plus aria-hidden="true" size={16} />
-                    Add member
-                  </Button>
+            <section className="tree-layout">
+              <Card className="tree-graph-card" padding="lg" variant="elevated">
+                <div className="section-heading tree-desktop-heading">
+                  <div>
+                    <h2>Tree graph</h2>
+                    <p>
+                      {focusedNode
+                        ? `${focusedNode.name} is shown as Self.`
+                        : 'Choose a member to view their immediate family.'}
+                    </p>
+                  </div>
+                  <Network aria-hidden="true" />
                 </div>
-              </div>
-            ) : null}
-          </Card>
-        </section>
+
+                {focusedNode ? (
+                  <FocusedFamilyGraph
+                    family={focusedFamily}
+                    familyHeadId={familyHeadId}
+                    focusMemberId={focusMemberId}
+                    onFocus={setFocusMemberId}
+                    role={role}
+                  />
+                ) : null}
+
+                {tree.nodes.length === 0 ? (
+                  <div className="tree-canvas">
+                    <div className="empty-state">
+                      <UsersRound aria-hidden="true" />
+                      <strong>No members yet</strong>
+                      <p>Add members and relationships to render a tree.</p>
+                      <Button component={Link} to={memberRoutes[role] ?? '/app/members'} type="button" variant="outline">
+                        <Plus aria-hidden="true" size={16} />
+                        Add member
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </Card>
+            </section>
+          </>
+        )}
       </section>
     </main>
   );
@@ -649,68 +660,4 @@ function lifeYears(member) {
   return member.is_living ? 'Living' : 'Dead';
 }
 
-function TreeLoadingSkeleton() {
-  return (
-    <div className="tree-loading-shell" aria-hidden="true">
-      <section className="tree-relation-section">
-        <div className="tree-section-title">
-          <span className="tree-skeleton-line short" />
-        </div>
-        <div className="tree-card-grid">
-          {[...Array(2)].map((_, index) => (
-            <div className="tree-person-card tree-skeleton-card" key={`tree-parent-skeleton-${index}`}>
-              <span className="tree-person-avatar tree-skeleton-avatar" />
-              <span className="tree-person-copy">
-                <span className="tree-skeleton-line medium" />
-                <span className="tree-skeleton-line short" />
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="tree-relation-section self-section">
-        <div className="tree-section-title">
-          <span className="tree-skeleton-line short" />
-        </div>
-        <div className="tree-self-row">
-          <div className="tree-person-card tree-skeleton-card">
-            <span className="tree-person-avatar tree-skeleton-avatar" />
-            <span className="tree-person-copy">
-              <span className="tree-skeleton-line medium" />
-              <span className="tree-skeleton-line short" />
-            </span>
-          </div>
-          <div className="tree-spouse-group">
-            <span className="tree-skeleton-line short" />
-            <div className="tree-card-grid compact">
-              <div className="tree-person-card tree-skeleton-card">
-                <span className="tree-person-avatar tree-skeleton-avatar" />
-                <span className="tree-person-copy">
-                  <span className="tree-skeleton-line medium" />
-                  <span className="tree-skeleton-line short" />
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="tree-relation-section">
-        <div className="tree-section-title">
-          <span className="tree-skeleton-line short" />
-        </div>
-        <div className="tree-card-grid">
-          <div className="tree-person-card tree-skeleton-card">
-            <span className="tree-person-avatar tree-skeleton-avatar" />
-            <span className="tree-person-copy">
-              <span className="tree-skeleton-line medium" />
-              <span className="tree-skeleton-line short" />
-            </span>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
 

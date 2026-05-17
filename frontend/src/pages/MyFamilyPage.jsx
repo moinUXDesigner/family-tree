@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Pencil, Trash2, UsersRound } from 'lucide-react';
+import { Pencil, Plus, Trash2, UsersRound } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLES } from '../config/roles.js';
 import { NavigationChrome } from '../app/NavigationChrome.jsx';
 import { Alert, Badge, Button, Card } from '../app/components';
+import { LoadingCard } from '../app/components/LoadingCard.jsx';
 import { familyApi } from '../services/familyApi.js';
 import { relationshipApi } from '../services/relationshipApi.js';
 
@@ -141,17 +142,32 @@ export function MyFamilyPage() {
   }
 
   const memberEditBaseRoute = memberRoutes[user.role] ?? '/app/members';
+  const memberAddRoute = `${memberRoutes[user.role] ?? '/app/members'}?quick_add=1`;
 
   return (
     <main className="dashboard-page">
       <NavigationChrome active="my-family" role={user.role} />
 
       <section className="dashboard-content">
+        {isLoading ? (
+          <LoadingCard
+            messages={[
+              'Connecting family relationships...',
+              'Building your family tree...',
+              'Preparing your family view...',
+            ]}
+            variant="relationships"
+          />
+        ) : null}
         <header className="dashboard-header">
           <div>
             <h1>My Family</h1>
             <p>View only your parents, spouse, siblings, and children.</p>
           </div>
+          <Button component={Link} to={memberAddRoute} type="button">
+            <Plus aria-hidden="true" />
+            Add Member
+          </Button>
         </header>
 
         {error ? <Alert variant="error">{error}</Alert> : null}

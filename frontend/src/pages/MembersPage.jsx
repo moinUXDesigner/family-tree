@@ -28,6 +28,7 @@ import { useAuth } from '../auth/useAuth.js';
 import { ROLE_HOME, ROLE_LABELS, ROLES } from '../config/roles.js';
 import { NavigationChrome } from '../app/NavigationChrome.jsx';
 import { Alert, Badge, Button, Card, Input } from '../app/components';
+import { LoadingCard } from '../app/components/LoadingCard.jsx';
 import { familyApi } from '../services/familyApi.js';
 
 const memberRoutes = {
@@ -941,6 +942,16 @@ export function MembersPage({ role }) {
       <NavigationChrome active="members" role={role} />
 
       <section className={`dashboard-content ${isMemberFormOpen ? 'members-form-open' : ''}`}>
+        {!isViewingMember && isLoading ? (
+          <LoadingCard
+            messages={[
+              'Preparing your family view...',
+              'Connecting family relationships...',
+              'Building your family tree...',
+            ]}
+            variant="tree_out"
+          />
+        ) : null}
         {!isMemberFormOpen ? (
           <header className="dashboard-header">
             <div>
@@ -975,22 +986,6 @@ export function MembersPage({ role }) {
             {success}
           </MuiAlert>
         </Snackbar>
-
-        {!isMemberFormOpen ? (
-          isEndUserRole ? (
-            <Card padding="md" variant="bordered">
-              <div className="section-heading">
-                <div>
-                  <h3>My Family Menu</h3>
-                </div>
-                <Button onClick={showAddMemberForm} type="button">
-                  <Plus aria-hidden="true" />
-                  Add Member
-                </Button>
-              </div>
-            </Card>
-          ) : null
-        ) : null}
 
         {!isMemberFormOpen ? (
           <div className="members-summary-row">

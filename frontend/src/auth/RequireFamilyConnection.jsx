@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
+import { LoadingCard } from '../app/components/LoadingCard.jsx';
 import { familyConnectionApi } from '../services/familyConnectionApi.js';
 import { useAuth } from './useAuth.js';
 
@@ -29,7 +30,14 @@ export function RequireFamilyConnection() {
   }, [token]);
 
   if (status === null) {
-    return <div className="screen-loader">Checking family connection...</div>;
+    return (
+      <LoadingCard
+        messages={[
+          'Verifying your approved family connection...',
+        ]}
+        variant="tree_in"
+      />
+    );
   }
 
   if (!status.is_connected || status.approval_status !== 'approved') {

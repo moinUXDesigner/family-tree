@@ -24,6 +24,7 @@ import { RequireRole } from './auth/RequireRole.jsx';
 import { ROLE_HOME, ROLES } from './config/roles.js';
 import { useAuth } from './auth/useAuth.js';
 import { AnalyticsTracker } from './analytics/googleAnalytics.js';
+import { LoadingCard } from './app/components/LoadingCard.jsx';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -41,9 +42,26 @@ function HomeRedirect() {
 }
 
 export function App() {
+  const { authTransition, routeTransition } = useAuth();
+
   return (
     <>
       <AnalyticsTracker />
+      {authTransition?.active ? (
+        <LoadingCard
+          messages={authTransition.messages?.length ? authTransition.messages : [authTransition.message || 'Preparing your family view...']}
+          mode={authTransition.mode || 'card'}
+          sequence={Boolean(authTransition.messages?.length)}
+          variant={authTransition.variant || 'tree_in'}
+        />
+      ) : null}
+      {!authTransition?.active && routeTransition?.active ? (
+        <LoadingCard
+          messages={[routeTransition.message || 'Connecting family relationships...']}
+          mode={routeTransition.mode || 'bare'}
+          variant={routeTransition.variant || 'relationships'}
+        />
+      ) : null}
       <Routes>
         <Route path="/" element={<HomeRedirect />} />
         <Route path="/login" element={<LoginPage />} />

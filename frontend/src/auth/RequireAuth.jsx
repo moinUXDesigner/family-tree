@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { LoadingCard } from '../app/components/LoadingCard.jsx';
 import { useAuth } from './useAuth.js';
 
 export function RequireAuth() {
@@ -6,7 +7,12 @@ export function RequireAuth() {
   const location = useLocation();
 
   if (isCheckingSession) {
-    return <div className="screen-loader">Checking session...</div>;
+    return (
+      <LoadingCard
+        messages={['Checking your secure session...']}
+        variant="relationships"
+      />
+    );
   }
 
   if (!isAuthenticated) {

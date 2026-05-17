@@ -4,6 +4,7 @@ import { GitBranch, Link2, LogOut, Network, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
 import { ROLES } from '../config/roles.js';
 import { Alert, Badge, Button, Card, Input } from '../app/components';
+import { LoadingCard } from '../app/components/LoadingCard.jsx';
 import { PwaInstallPrompt } from '../pwa/PwaInstallPrompt.jsx';
 import { familyConnectionApi } from '../services/familyConnectionApi.js';
 
@@ -77,6 +78,19 @@ export function FamilyConnectionPage() {
 
   if (user.role !== ROLES.USER) {
     return <Navigate to="/" replace />;
+  }
+
+  if (isLoading) {
+    return (
+      <LoadingCard
+        messages={['Verifying your approved family connection...']}
+        variant="relationships"
+      />
+    );
+  }
+
+  if (status?.is_connected && status?.approval_status === 'approved') {
+    return <Navigate to="/app/tree" replace />;
   }
 
   async function handleSubmit(event) {
@@ -236,16 +250,6 @@ export function FamilyConnectionPage() {
           </form>
         ) : null}
 
-        {status?.is_connected && status.approval_status === 'approved' ? (
-          <Button
-            fullWidth
-            onClick={() => navigate('/app/tree', { replace: true })}
-            type="button"
-            variant="outline"
-          >
-            Continue to tree
-          </Button>
-        ) : null}
       </Card>
     </main>
   );

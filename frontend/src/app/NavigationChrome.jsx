@@ -123,7 +123,7 @@ const feedbackInboxRoutes = {
 const bottomNavHiddenKeys = new Set(['members', 'families', 'root-family', 'users', 'approvals', 'my-family']);
 
 export function NavigationChrome({ active, mobileBackTo = '', role }) {
-  const { logout, user } = useAuth();
+  const { logout, startRouteTransition, user } = useAuth();
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -140,6 +140,22 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
 
   function closeMobileSidebar() {
     setIsMobileSidebarOpen(false);
+  }
+
+  function handleNavItemClick(item) {
+    if (item.key === 'tree') {
+      startRouteTransition({
+        message: 'Connecting family relationships...',
+        mode: 'bare',
+        variant: 'relationships',
+      });
+    }
+    closeMobileSidebar();
+  }
+
+  async function handleLogout() {
+    closeMobileSidebar();
+    await logout();
   }
 
   return (
@@ -233,7 +249,7 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
             <Tooltip disableHoverListener={!isCollapsed} key={item.key} placement="right" title={item.label}>
               <Link
                 className={active === item.key ? 'nav-item active' : 'nav-item'}
-                onClick={closeMobileSidebar}
+                onClick={() => handleNavItemClick(item)}
                 to={item.route[role] ?? ROLE_HOME[ROLES.USER]}
               >
                 {item.icon}
@@ -258,7 +274,7 @@ export function NavigationChrome({ active, mobileBackTo = '', role }) {
             <FeedbackOutlined aria-hidden="true" />
             <span>Send Feedback</span>
           </Link>
-          <button className="nav-logout-button" onClick={logout} type="button">
+          <button className="nav-logout-button" onClick={handleLogout} type="button">
             <LogoutIcon aria-hidden="true" />
             <span>Logout</span>
           </button>
