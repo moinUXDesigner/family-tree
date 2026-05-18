@@ -89,6 +89,7 @@ export function App() {
             <Route path="/super-admin/activity" element={<ActivityPage role={ROLES.SUPER_ADMIN} />} />
             <Route path="/super-admin/root-family" element={<RootFamilyPage />} />
             <Route path="/super-admin/tree" element={<TreePage role={ROLES.SUPER_ADMIN} />} />
+            <Route path="/super-admin/my-family" element={<MyFamilyPage />} />
             <Route path="/super-admin/feedback" element={<FeedbackPage role={ROLES.SUPER_ADMIN} />} />
             <Route path="/super-admin/feedbacks" element={<FeedbackInboxPage role={ROLES.SUPER_ADMIN} />} />
           </Route>
@@ -98,6 +99,7 @@ export function App() {
             <Route path="/admin/members" element={<MembersPage role={ROLES.ADMIN} />} />
             <Route path="/admin/activity" element={<ActivityPage role={ROLES.ADMIN} />} />
             <Route path="/admin/tree" element={<TreePage role={ROLES.ADMIN} />} />
+            <Route path="/admin/my-family" element={<MyFamilyPage />} />
             <Route path="/admin/feedback" element={<FeedbackPage role={ROLES.ADMIN} />} />
             <Route path="/admin/feedbacks" element={<FeedbackInboxPage role={ROLES.ADMIN} />} />
           </Route>

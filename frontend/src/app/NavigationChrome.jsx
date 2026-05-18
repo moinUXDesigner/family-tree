@@ -56,8 +56,10 @@ const navItems = [
     key: 'my-family',
     label: 'My Family',
     icon: <FamilyRestroom />,
-    roles: [ROLES.USER],
+    roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.USER],
     route: {
+      [ROLES.SUPER_ADMIN]: '/super-admin/my-family',
+      [ROLES.ADMIN]: '/admin/my-family',
       [ROLES.USER]: '/app/my-family',
     },
   },

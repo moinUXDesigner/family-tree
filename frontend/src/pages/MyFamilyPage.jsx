@@ -20,6 +20,7 @@ const relationLabels = {
   child: 'Child',
   spouse: 'Spouse',
   sibling: 'Sibling',
+  guardian: 'Guardian',
 };
 
 export function MyFamilyPage() {
@@ -43,14 +44,16 @@ export function MyFamilyPage() {
       return new Map();
     }
 
+    const selfId = Number(selfMember.id);
     const mapped = new Map();
+    const spouseLinks = [];
+
     relationships.forEach((rel) => {
-      const selfId = selfMember.id;
       const fromId = Number(rel.from_member_id);
       const toId = Number(rel.to_member_id);
-      const type = rel.relationship_type;
+      const relationType = normalizeRelationshipType(rel.relationship_type);
 
-      if (type === 'parent') {
+      if (relationType === 'parent') {
         if (toId === selfId) {
           addRelation(mapped, fromId, 'parent');
         } else if (fromId === selfId) {
@@ -58,7 +61,8 @@ export function MyFamilyPage() {
         }
       }
 
-      if (type === 'spouse') {
+      if (relationType === 'spouse') {
+        spouseLinks.push({ fromId, toId });
         if (fromId === selfId) {
           addRelation(mapped, toId, 'spouse');
         } else if (toId === selfId) {
@@ -66,13 +70,32 @@ export function MyFamilyPage() {
         }
       }
 
-      if (type === 'sibling') {
+      if (relationType === 'sibling') {
         if (fromId === selfId) {
           addRelation(mapped, toId, 'sibling');
         } else if (toId === selfId) {
           addRelation(mapped, fromId, 'sibling');
         }
       }
+
+      if (relationType === 'guardian') {
+        if (toId === selfId) {
+          addRelation(mapped, fromId, 'guardian');
+        } else if (fromId === selfId) {
+          addRelation(mapped, toId, 'child');
+        }
+      }
+    });
+
+    // If only one parent is directly linked, include their spouse as a co-parent.
+    const directParentIds = [...mapped.entries()]
+      .filter(([, relationTypes]) => relationTypes.has('parent'))
+      .map(([memberId]) => Number(memberId));
+
+    directParentIds.forEach((parentId) => {
+      spouseMemberIds(parentId, spouseLinks).forEach((spouseId) => {
+        addRelation(mapped, spouseId, 'parent');
+      });
     });
 
     return mapped;
@@ -81,7 +104,8 @@ export function MyFamilyPage() {
   const familyMembers = useMemo(
     () => members
       .filter((member) => relativeMap.has(member.id))
-      .filter((member) => !member.is_private),
+      .filter((member) => !member.is_private)
+      .sort((left, right) => relationPriority(relativeMap.get(left.id)) - relationPriority(relativeMap.get(right.id))),
     [members, relativeMap],
   );
 
@@ -262,4 +286,71 @@ function addRelation(map, memberId, relationType) {
   const next = map.get(memberId) ?? new Set();
   next.add(relationType);
   map.set(memberId, next);
+}
+
+function normalizeRelationshipType(type) {
+  const normalized = String(type ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  if (['parent', 'father', 'mother', 'female_parent', 'male_parent'].includes(normalized)) {
+    return 'parent';
+  }
+
+  if (['child', 'son', 'daughter'].includes(normalized)) {
+    return 'child';
+  }
+
+  if (['spouse', 'husband', 'wife'].includes(normalized)) {
+    return 'spouse';
+  }
+
+  if (['sibling', 'brother', 'sister', 'brother_in_law', 'sister_in_law', 'in_law'].includes(normalized)) {
+    return 'sibling';
+  }
+
+  if (['guardian', 'ward'].includes(normalized)) {
+    return 'guardian';
+  }
+
+  return normalized;
+}
+
+function spouseMemberIds(memberId, spouseLinks) {
+  return spouseLinks.flatMap((link) => {
+    if (link.fromId === memberId) {
+      return [link.toId];
+    }
+
+    if (link.toId === memberId) {
+      return [link.fromId];
+    }
+
+    return [];
+  });
+}
+
+function relationPriority(relationTypes = new Set()) {
+  if (relationTypes.has('parent')) {
+    return 1;
+  }
+
+  if (relationTypes.has('guardian')) {
+    return 2;
+  }
+
+  if (relationTypes.has('spouse')) {
+    return 3;
+  }
+
+  if (relationTypes.has('sibling')) {
+    return 4;
+  }
+
+  if (relationTypes.has('child')) {
+    return 5;
+  }
+
+  return 99;
 }
