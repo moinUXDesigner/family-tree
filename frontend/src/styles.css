@@ -919,6 +919,91 @@ p {
   justify-content: space-between;
 }
 
+.admin-member-flow-fullscreen {
+  max-width: 100%;
+  width: 100%;
+  min-height: calc(100vh - 1rem);
+  padding-top: 0.25rem;
+}
+
+.admin-flow-progress {
+  width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.admin-flow-progress-bar {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2f6df6;
+  transition: width 0.2s ease;
+}
+
+.admin-flow-question-wrap {
+  margin: 4px 0 12px;
+  text-align: left;
+}
+
+.admin-flow-question-wrap h3 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.25;
+  color: #0f172a;
+}
+
+.admin-flow-label {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.admin-flow-choice-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.admin-flow-choice {
+  min-height: 58px;
+  border: 1px solid #d8dee8;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-flow-choice.active {
+  background: #2a7bcd;
+  color: #ffffff;
+  border-color: #2a7bcd;
+}
+
+.admin-flow-choice:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.flow-screen,
+.admin-step-panel {
+  animation: member-step-enter 220ms ease both;
+}
+
+@keyframes member-step-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .members-confirm-checkbox {
   display: flex;
   align-items: flex-start;
@@ -3525,6 +3610,11 @@ p {
     gap: 10px;
   }
 
+  .admin-member-flow-fullscreen {
+    min-height: calc(100vh - 0.5rem);
+    padding-top: 0;
+  }
+
   .member-conversation {
     display: grid;
     gap: 20px;
@@ -4785,7 +4875,14 @@ p {
     width: 132px;
   }
 
-  .loading-screen-bare .loading-screen-text {
+.loading-screen-bare .loading-screen-text {
     font-size: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-screen,
+  .admin-step-panel {
+    animation: none;
   }
 }

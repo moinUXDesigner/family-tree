@@ -151,6 +151,7 @@ export function MembersPage({ role }) {
   const isEditingMember = Boolean(editingMember);
   const isViewingMember = Boolean(viewingMember);
   const isEndUserAddFlow = role === ROLES.USER && !isEditingMember;
+  const isAdminAddFlowActive = !isEndUserAddFlow && isAddingMember && !isEditingMember;
   const isEndUserRole = role === ROLES.USER;
   const allowedAddMemberTypes = useMemo(
     () => (role === ROLES.USER ? endUserAddMemberTypes : addMemberTypeOptions.map(([value]) => value)),
@@ -239,6 +240,8 @@ export function MembersPage({ role }) {
     : canSubmitAddMemberForm(selectedFamilyId, effectiveForm, {
       ignoreHouseholdRequirement: isEndUserAddFlow && form.add_member_type !== 'child',
     }) && (!requiresStepConfirmation || isStep3Confirmed) && isDuplicateGatePassed && duplicateDecision !== 'use_existing';
+  const adminTotalSteps = 6;
+  const adminProgressPercent = Math.max(0, Math.min(100, (addStep / adminTotalSteps) * 100));
 
   const stats = useMemo(() => {
     const livingCount = members.filter((member) => member.is_living).length;
@@ -865,6 +868,10 @@ export function MembersPage({ role }) {
         return false;
       }
 
+      return true;
+    }
+
+    if (step === 2) {
       if (needsExistingPerson(form.add_member_type) && !form.existing_person_id) {
         return false;
       }
@@ -876,7 +883,7 @@ export function MembersPage({ role }) {
       return true;
     }
 
-    if (step === 2) {
+    if (step === 3) {
       if (form.add_member_type === 'existing_to_household') {
         return true;
       }
@@ -908,7 +915,7 @@ export function MembersPage({ role }) {
 
   function canOpenStep(step) {
     if (isExistingToHouseholdFlow()) {
-      return step === 1;
+      return step <= 2;
     }
 
     if (isEditingMember) {
@@ -939,9 +946,9 @@ export function MembersPage({ role }) {
 
   return (
     <main className="dashboard-page">
-      <NavigationChrome active="members" role={role} />
+      {!isAdminAddFlowActive ? <NavigationChrome active="members" role={role} /> : null}
 
-      <section className={`dashboard-content ${isMemberFormOpen ? 'members-form-open' : ''}`}>
+      <section className={`dashboard-content ${isMemberFormOpen ? 'members-form-open' : ''} ${isAdminAddFlowActive ? 'admin-member-flow-fullscreen' : ''}`}>
         {!isViewingMember && isLoading ? (
           <LoadingCard
             messages={[
@@ -1676,49 +1683,37 @@ export function MembersPage({ role }) {
                   ) : (
                     <>
                       <div className="member-form-wide">
-                        <div className="members-stepper">
-                          {[
-                            [1, 'Input'],
-                            [2, 'Review'],
-                            [3, 'Contact'],
-                            [4, 'Photo'],
-                            [5, 'Done'],
-                          ].map(([step, label]) => (
-                            <button
-                              className={addStep === step ? 'active' : ''}
-                              key={step}
-                              disabled={!canOpenStep(step)}
-                              onClick={() => {
-                                if (canOpenStep(step)) {
-                                  setAddStep(step);
-                                }
-                              }}
-                              type="button"
-                            >
-                              <span className="step-circle">{step}</span>
-                              <span className="step-label">{label}</span>
-                            </button>
-                          ))}
+                        <div className="admin-flow-progress" role="presentation" aria-hidden="true">
+                          <span className="admin-flow-progress-bar" style={{ width: `${adminProgressPercent}%` }} />
+                        </div>
+                        <div className="admin-flow-question-wrap">
+                          <h3>{adminFlowTitle(addStep, form, members, households)}</h3>
                         </div>
                       </div>
 
                       {addStep === 1 ? (
-                        <>
+                        <div className="admin-step-panel">
                           <label className="field-group member-form-wide">
-                            Add Member Type
-                            <select
-                              value={form.add_member_type}
-                              onChange={(event) => updateAddMemberType(event.target.value)}
-                              required
-                            >
+                            <span className="admin-flow-label">Add Member Type</span>
+                            <div className="admin-flow-choice-grid">
                               {addMemberTypeOptions.map(([value, label, isDisabled]) => (
-                                <option disabled={isDisabled} key={value} value={value}>
-                                  {label}
-                                </option>
+                                <button
+                                  key={value}
+                                  className={`admin-flow-choice ${form.add_member_type === value ? 'active' : ''}`}
+                                  disabled={isDisabled}
+                                  onClick={() => updateAddMemberType(value)}
+                                  type="button"
+                                >
+                                  {label.replace('Add ', '')}
+                                </button>
                               ))}
-                            </select>
+                            </div>
                           </label>
+                        </div>
+                      ) : null}
 
+                      {addStep === 2 ? (
+                        <div className="admin-step-panel">
                           {needsExistingPerson(form.add_member_type) ? (
                             <label className="field-group member-form-wide">
                               Existing person
@@ -1764,15 +1759,15 @@ export function MembersPage({ role }) {
                               </small>
                             </label>
                           ) : null}
-                        </>
+                        </div>
                       ) : null}
                     </>
                   )}
                 </>
               ) : null}
 
-              {(!isEndUserAddFlow && (isEditingMember || addStep === 2)) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
-                <>
+              {(!isEndUserAddFlow && (isEditingMember || addStep === 3)) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
+                <div className="admin-step-panel">
                   <Input
                     label="Full name"
                     leftIcon={<UserRound aria-hidden="true" size={18} />}
@@ -1810,11 +1805,11 @@ export function MembersPage({ role }) {
                     <MenuItem value="non_binary">Non-binary</MenuItem>
                     <MenuItem value="prefer_not_to_say">Prefer not to say</MenuItem>
                   </TextField>
-                </>
+                </div>
               ) : null}
 
-              {(!isEndUserAddFlow && (isEditingMember || addStep === 3)) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
-                <>
+              {(!isEndUserAddFlow && (isEditingMember || addStep === 4)) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
+                <div className="admin-step-panel">
                   <Input
                     label="Email"
                     leftIcon={<Mail aria-hidden="true" size={18} />}
@@ -1844,11 +1839,11 @@ export function MembersPage({ role }) {
                     onChange={(event) => updateForm('current_country', event.target.value)}
                     fullWidth
                   />
-                </>
+                </div>
               ) : null}
 
-              {(!isEndUserAddFlow && (isEditingMember || addStep === 4)) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
-                <div className="member-form-wide member-photo-section">
+              {(!isEndUserAddFlow && (isEditingMember || addStep === 5)) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
+                <div className="admin-step-panel member-form-wide member-photo-section">
                   <div className="member-photo-preview">
                     {photoPreviewUrl ? (
                       <img alt="Member preview" src={photoPreviewUrl} />
@@ -1903,8 +1898,8 @@ export function MembersPage({ role }) {
                 </div>
               ) : null}
 
-              {(!isEndUserAddFlow && (isEditingMember || addStep === 5)) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
-                <>
+              {(!isEndUserAddFlow && (isEditingMember || addStep === 6)) && (form.add_member_type !== 'existing_to_household' || isEditingMember) ? (
+                <div className="admin-step-panel">
                   <label className="field-group member-form-wide">
                     Married / Unmarried
                     <select
@@ -1974,21 +1969,34 @@ export function MembersPage({ role }) {
                       </label>
                     </label>
                   ) : null}
-                </>
+                </div>
               ) : null}
 
               {!isEndUserAddFlow && !isEditingMember ? (
                 <div className="member-form-wide members-step-actions">
                   {isExistingToHouseholdFlow() ? (
-                    <Button
-                      className="member-form-action"
-                      disabled={isSubmitting || !canSubmitMemberForm}
-                      isLoading={isSubmitting}
-                      type="submit"
-                    >
-                      <Plus aria-hidden="true" />
-                      Add member
-                    </Button>
+                    <>
+                      {addStep > 1 ? (
+                        <Button onClick={() => setAddStep((current) => Math.max(1, current - 1))} type="button" variant="outline">
+                          Back
+                        </Button>
+                      ) : <span />}
+                      {addStep < 2 ? (
+                        <Button disabled={!canProceedStep(addStep)} onClick={() => setAddStep(2)} type="button">
+                          Next
+                        </Button>
+                      ) : (
+                        <Button
+                          className="member-form-action"
+                          disabled={isSubmitting || !canSubmitMemberForm}
+                          isLoading={isSubmitting}
+                          type="submit"
+                        >
+                          <Plus aria-hidden="true" />
+                          Add member
+                        </Button>
+                      )}
+                    </>
                   ) : (
                     <>
                       {addStep > 1 ? (
@@ -1996,8 +2004,8 @@ export function MembersPage({ role }) {
                           Back
                         </Button>
                       ) : <span />}
-                      {addStep < 5 ? (
-                        <Button disabled={!canProceedStep(addStep)} onClick={() => setAddStep((current) => Math.min(5, current + 1))} type="button">
+                      {addStep < 6 ? (
+                        <Button disabled={!canProceedStep(addStep)} onClick={() => setAddStep((current) => Math.min(6, current + 1))} type="button">
                           Next
                         </Button>
                       ) : (
@@ -2381,6 +2389,49 @@ function memberAge(birthDate) {
   }
 
   return age >= 0 ? `${age} years` : 'Not set';
+}
+
+function adminFlowTitle(step, form, members, households) {
+  if (step === 1) {
+    return 'Who do you want to add?';
+  }
+
+  if (step === 2) {
+    const typeLabel = {
+      spouse: 'spouse',
+      child: 'child',
+      parent: 'parent',
+      sibling: 'sibling',
+      existing_to_household: 'existing person',
+    }[form.add_member_type] ?? 'member';
+    return `Link this ${typeLabel}`;
+  }
+
+  if (step === 3) {
+    const linkedMember = members.find((member) => String(member.id) === String(form.existing_person_id));
+    if (linkedMember) {
+      return `Basic details for ${linkedMember.display_name}`;
+    }
+    return 'Tell us basic details';
+  }
+
+  if (step === 4) {
+    return 'Add contact information';
+  }
+
+  if (step === 5) {
+    return 'Add a profile photo';
+  }
+
+  if (step === 6) {
+    if (form.add_member_type === 'existing_to_household') {
+      const household = households.find((item) => String(item.id) === String(form.household_id));
+      return household ? `Confirm household: ${household.name}` : 'Confirm household assignment';
+    }
+    return 'Confirm current status';
+  }
+
+  return 'Add member';
 }
 
 function buildMemberRequestPayload(payload, photoFile) {
